@@ -15,46 +15,54 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-md bg-card border-border">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[400px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+
+      <Card className="w-full max-w-md bg-card/80 border-border/50 backdrop-blur-sm shadow-2xl shadow-background/50 animate-in relative z-10">
         <CardContent className="p-8">
           <div className="text-center mb-8">
-            <span className="text-primary font-bold text-2xl tracking-tight">EMBER</span>
-            <h1 className="text-2xl font-bold mt-4">Accedi a Ember</h1>
+            <div className="inline-flex w-12 h-12 rounded-xl bg-primary/10 items-center justify-center mb-4">
+              <span className="text-primary font-extrabold text-lg">E</span>
+            </div>
+            <h1 className="text-2xl font-bold mt-2">Accedi a Ember</h1>
             <p className="text-muted-foreground mt-2 text-sm">
               Inserisci la tua email per ricevere il magic link.
             </p>
           </div>
 
           {!sent ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 animate-in animate-in-delay-1">
               <Input
                 type="email"
                 placeholder="tu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-surface border-border focus:border-primary"
+                className="bg-surface border-border/50 focus:border-primary h-12 text-base"
                 required
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">
+              <Button type="submit" className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-12 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
                 <Mail className="mr-2 h-4 w-4" />
                 Invia magic link
               </Button>
             </form>
           ) : (
-            <div className="text-center py-6">
-              <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
-              <p className="text-foreground font-medium">
+            <div className="text-center py-8 animate-in">
+              <div className="relative inline-block">
+                <CheckCircle className="h-14 w-14 text-success" />
+                <div className="absolute inset-0 h-14 w-14 rounded-full animate-ping bg-success/10" />
+              </div>
+              <p className="text-foreground font-medium mt-4">
                 Controlla la tua email.
               </p>
               <p className="text-muted-foreground text-sm mt-1">
-                Abbiamo inviato un link di accesso.
+                Abbiamo inviato un link di accesso a <span className="text-foreground font-medium">{email}</span>.
               </p>
             </div>
           )}
 
           <div className="mt-6 text-center">
-            <Link to="/" className="text-sm text-muted-foreground hover:text-primary">
+            <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
               ← Torna alla home
             </Link>
           </div>

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SkillIcon } from "@/components/SkillIcon";
 import { ScoreBadge } from "@/components/ScoreBadge";
-import { Copy, RefreshCw, Loader2, ChevronRight, CheckCircle } from "lucide-react";
+import { Copy, RefreshCw, Loader2, ChevronRight, CheckCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 // Mock outputs per skill
@@ -124,7 +124,7 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <Button variant="ghost" size="sm" onClick={handleCopy}>
+    <Button variant="ghost" size="sm" onClick={handleCopy} className="hover:text-primary transition-colors">
       {copied ? <CheckCircle className="h-3 w-3 mr-1 text-success" /> : <Copy className="h-3 w-3 mr-1" />}
       {copied ? "Copiato" : "Copia"}
     </Button>
@@ -133,43 +133,43 @@ function CopyButton({ text }: { text: string }) {
 
 function CharCounter({ text, limit }: { text: string; limit: number }) {
   const count = text.length;
+  const pct = (count / limit) * 100;
   return (
-    <span className={`text-xs ${count > limit ? 'text-destructive' : 'text-muted-foreground'}`}>
-      {count}/{limit} caratteri
+    <span className={`text-xs tabular-nums ${count > limit ? 'text-destructive' : pct > 80 ? 'text-warning' : 'text-muted-foreground'}`}>
+      {count}/{limit}
     </span>
   );
 }
 
-// Render output per ogni skill
 function SkillOutput({ skillId, output }: { skillId: string; output: Record<string, unknown> }) {
   const data = output as any;
 
   if (skillId === 'profile-optimizer') {
     return (
-      <div className="space-y-6">
-        <div className="text-center"><ScoreBadge score={data.score} size="lg" className="mx-auto" /></div>
+      <div className="space-y-6 animate-in">
+        <div className="text-center py-2"><ScoreBadge score={data.score} size="lg" className="mx-auto" /></div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {data.sections?.map((s: any) => (
-            <Card key={s.name} className="bg-surface border-border">
+          {data.sections?.map((s: any, i: number) => (
+            <Card key={s.name} className="bg-surface/50 border-border/30 hover:border-border transition-all group" style={{ animationDelay: `${i * 80}ms` }}>
               <CardContent className="p-4">
                 <div className="flex justify-between items-center mb-2"><span className="font-medium text-sm">{s.name}</span><ScoreBadge score={s.score} size="sm" /></div>
                 <p className="text-xs text-muted-foreground mb-1">{s.problem}</p>
-                <p className="text-xs text-primary">→ {s.action}</p>
+                <p className="text-xs text-primary group-hover:translate-x-0.5 transition-transform">→ {s.action}</p>
               </CardContent>
             </Card>
           ))}
         </div>
         <div>
           <h3 className="font-semibold mb-2">About riscritto</h3>
-          <div className="bg-surface border border-border rounded-lg p-4 relative">
-            <pre className="text-sm whitespace-pre-wrap">{data.about_rewrite}</pre>
-            <CopyButton text={data.about_rewrite} />
+          <div className="bg-surface/50 border border-border/30 rounded-xl p-5 relative">
+            <pre className="text-sm whitespace-pre-wrap leading-relaxed">{data.about_rewrite}</pre>
+            <div className="mt-3 pt-3 border-t border-border/20"><CopyButton text={data.about_rewrite} /></div>
           </div>
         </div>
         <div>
           <h3 className="font-semibold mb-2">Headline riscritte</h3>
           {data.headlines?.map((h: string, i: number) => (
-            <div key={i} className="flex items-center gap-2 bg-surface border border-border rounded-lg p-3 mb-2">
+            <div key={i} className="flex items-center gap-2 bg-surface/50 border border-border/30 rounded-xl p-4 mb-2 hover:border-primary/30 transition-colors group">
               <p className="text-sm flex-1">{h}</p>
               <CopyButton text={h} />
             </div>
@@ -178,7 +178,7 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
         <div>
           <h3 className="font-semibold mb-2">Keywords ICP</h3>
           <div className="flex flex-wrap gap-2">
-            {data.keywords?.map((k: string) => <Badge key={k} className="bg-primary-light text-primary border-0 cursor-pointer" onClick={() => { navigator.clipboard.writeText(k); toast.success("Copiato!"); }}>{k}</Badge>)}
+            {data.keywords?.map((k: string) => <Badge key={k} className="bg-primary/10 text-primary border-0 cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => { navigator.clipboard.writeText(k); toast.success("Copiato!"); }}>{k}</Badge>)}
           </div>
         </div>
       </div>
@@ -187,27 +187,27 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
 
   if (skillId === 'post-writer') {
     return (
-      <div className="space-y-4">
-        <div className="border-l-4 border-primary bg-surface p-4 rounded-r-lg">
-          <p className="font-bold text-lg whitespace-pre-wrap">{data.hook}</p>
+      <div className="space-y-4 animate-in">
+        <div className="border-l-4 border-primary bg-primary/5 p-5 rounded-r-xl">
+          <p className="font-bold text-lg whitespace-pre-wrap leading-relaxed">{data.hook}</p>
         </div>
-        <div className="text-sm whitespace-pre-wrap leading-relaxed">{data.body}</div>
-        <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
+        <div className="text-sm whitespace-pre-wrap leading-relaxed px-1">{data.body}</div>
+        <div className="bg-primary/5 border border-primary/20 p-5 rounded-xl">
           <p className="text-sm whitespace-pre-wrap">{data.cta}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {data.hashtags?.map((h: string) => <Badge key={h} variant="outline" className="border-border">{h}</Badge>)}
+          {data.hashtags?.map((h: string) => <Badge key={h} variant="outline" className="border-border/50 hover:border-primary/50 transition-colors">{h}</Badge>)}
         </div>
-        <details className="text-sm">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Hook alternativo</summary>
-          <p className="mt-2 whitespace-pre-wrap bg-surface p-3 rounded-lg border border-border">{data.alt_hook}</p>
+        <details className="text-sm group">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">Hook alternativo</summary>
+          <p className="mt-2 whitespace-pre-wrap bg-surface/50 p-4 rounded-xl border border-border/30 animate-in">{data.alt_hook}</p>
         </details>
-        <p className="text-xs text-muted-foreground">⏰ Orario suggerito: {data.best_time}</p>
-        <div className="flex gap-2">
+        <p className="text-xs text-muted-foreground">⏰ Orario suggerito: <span className="text-foreground font-medium">{data.best_time}</span></p>
+        <div className="flex gap-2 pt-2">
           <CopyButton text={`${data.hook}\n\n${data.body}\n\n${data.cta}\n\n${data.hashtags?.join(' ')}`} />
           <Link to={`/skill/visual-post-builder?post=${encodeURIComponent(data.hook + '\n' + data.body)}`}>
-            <Button variant="outline" size="sm" className="border-border">
-              Crea visual per questo post <ChevronRight className="ml-1 h-3 w-3" />
+            <Button variant="outline" size="sm" className="border-border/50 hover:border-primary/50 hover:text-primary transition-all">
+              Crea visual <ChevronRight className="ml-1 h-3 w-3" />
             </Button>
           </Link>
         </div>
@@ -217,20 +217,20 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
 
   if (skillId === 'visual-post-builder') {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5 animate-in">
         <div>
-          <h3 className="font-semibold mb-2">🎨 Canva</h3>
-          <a href={`https://www.canva.com/templates/?query=${encodeURIComponent(data.canva_query)}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">{data.canva_query}</a>
-          <ul className="mt-2 space-y-1">{data.slides?.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground">• {s}</li>)}</ul>
+          <h3 className="font-semibold mb-3">🎨 Canva</h3>
+          <a href={`https://www.canva.com/templates/?query=${encodeURIComponent(data.canva_query)}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:text-primary-hover transition-colors underline underline-offset-4">{data.canva_query}</a>
+          <ul className="mt-3 space-y-2">{data.slides?.map((s: string, i: number) => <li key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-primary mt-0.5 shrink-0">{i + 1}.</span>{s}</li>)}</ul>
         </div>
         <div>
-          <h3 className="font-semibold mb-2">🤖 AI Image Prompt</h3>
-          <div className="bg-surface border border-border rounded-lg p-3"><p className="text-sm font-mono">{data.midjourney_prompt}</p><CopyButton text={data.midjourney_prompt} /></div>
-          <div className="bg-surface border border-border rounded-lg p-3 mt-2"><p className="text-sm font-mono">{data.flux_prompt}</p><CopyButton text={data.flux_prompt} /></div>
+          <h3 className="font-semibold mb-3">🤖 AI Image Prompt</h3>
+          <div className="bg-surface/50 border border-border/30 rounded-xl p-4 group hover:border-border transition-colors"><p className="text-sm font-mono">{data.midjourney_prompt}</p><div className="mt-2"><CopyButton text={data.midjourney_prompt} /></div></div>
+          <div className="bg-surface/50 border border-border/30 rounded-xl p-4 mt-2 group hover:border-border transition-colors"><p className="text-sm font-mono">{data.flux_prompt}</p><div className="mt-2"><CopyButton text={data.flux_prompt} /></div></div>
         </div>
         <div>
-          <h3 className="font-semibold mb-2">Palette</h3>
-          <div className="flex gap-3">{data.palette?.map((c: string) => <div key={c} className="flex items-center gap-2"><div className="w-8 h-8 rounded" style={{ background: c }} /><span className="text-xs font-mono">{c}</span></div>)}</div>
+          <h3 className="font-semibold mb-3">Palette</h3>
+          <div className="flex gap-3">{data.palette?.map((c: string) => <div key={c} className="flex items-center gap-2 group"><div className="w-10 h-10 rounded-lg shadow-inner group-hover:scale-110 transition-transform" style={{ background: c }} /><span className="text-xs font-mono text-muted-foreground">{c}</span></div>)}</div>
         </div>
         <p className="text-xs text-muted-foreground">Font: {data.fonts?.join(', ')}</p>
         <p className="text-xs text-muted-foreground">Alt text: {data.alt_text}</p>
@@ -240,67 +240,77 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
 
   if (skillId === 'content-performance') {
     return (
-      <div className="space-y-4">
-        <div className="text-center"><ScoreBadge score={data.score} size="lg" className="mx-auto" /></div>
-        <Card className="bg-surface border-border"><CardContent className="p-4"><h3 className="font-semibold text-sm mb-1">🏆 Top Performer</h3><p className="text-sm text-muted-foreground">{data.top_performer?.reason}</p></CardContent></Card>
+      <div className="space-y-5 animate-in">
+        <div className="text-center py-2"><ScoreBadge score={data.score} size="lg" className="mx-auto" /></div>
+        <Card className="bg-primary/5 border-primary/20"><CardContent className="p-4"><h3 className="font-semibold text-sm mb-1">🏆 Top Performer</h3><p className="text-sm text-muted-foreground">{data.top_performer?.reason}</p></CardContent></Card>
         <div className="grid sm:grid-cols-2 gap-4">
-          <div><h3 className="font-semibold text-sm mb-2 text-success">✅ Pattern positivi</h3>{data.positive_patterns?.map((p: string, i: number) => <p key={i} className="text-sm text-muted-foreground mb-1">• {p}</p>)}</div>
-          <div><h3 className="font-semibold text-sm mb-2 text-destructive">❌ Pattern negativi</h3>{data.negative_patterns?.map((p: string, i: number) => <p key={i} className="text-sm text-muted-foreground mb-1">• {p}</p>)}</div>
+          <div className="space-y-2"><h3 className="font-semibold text-sm text-success">✅ Pattern positivi</h3>{data.positive_patterns?.map((p: string, i: number) => <p key={i} className="text-sm text-muted-foreground">• {p}</p>)}</div>
+          <div className="space-y-2"><h3 className="font-semibold text-sm text-destructive">❌ Pattern negativi</h3>{data.negative_patterns?.map((p: string, i: number) => <p key={i} className="text-sm text-muted-foreground">• {p}</p>)}</div>
         </div>
         <div className="grid sm:grid-cols-3 gap-3">
-          <Card className="bg-surface border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Formato migliore</p><p className="text-sm font-medium">{data.best_format}</p></CardContent></Card>
-          <Card className="bg-surface border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Lunghezza ottimale</p><p className="text-sm font-medium">{data.optimal_length}</p></CardContent></Card>
-          <Card className="bg-surface border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Orario migliore</p><p className="text-sm font-medium">{data.best_time}</p></CardContent></Card>
+          {[
+            { label: 'Formato migliore', value: data.best_format },
+            { label: 'Lunghezza ottimale', value: data.optimal_length },
+            { label: 'Orario migliore', value: data.best_time },
+          ].map(item => (
+            <Card key={item.label} className="bg-surface/50 border-border/30"><CardContent className="p-4"><p className="text-xs text-muted-foreground mb-1">{item.label}</p><p className="text-sm font-medium">{item.value}</p></CardContent></Card>
+          ))}
         </div>
-        <div><h3 className="font-semibold text-sm mb-2">Topic suggeriti</h3><div className="flex flex-wrap gap-2">{data.topics?.map((t: string) => <Badge key={t} className="bg-primary-light text-primary border-0">{t}</Badge>)}</div></div>
+        <div><h3 className="font-semibold text-sm mb-2">Topic suggeriti</h3><div className="flex flex-wrap gap-2">{data.topics?.map((t: string) => <Badge key={t} className="bg-primary/10 text-primary border-0">{t}</Badge>)}</div></div>
       </div>
     );
   }
 
   if (skillId === 'icp-builder') {
     return (
-      <div className="space-y-4">
-        <Card className="bg-surface border-border"><CardContent className="p-4">
-          <h3 className="font-semibold mb-3">🎯 ICP Card</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="space-y-5 animate-in">
+        <Card className="bg-surface/50 border-border/30"><CardContent className="p-5">
+          <h3 className="font-semibold mb-4">🎯 ICP Card</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
             {Object.entries(data.icp || {}).map(([k, v]) => (
-              <div key={k}><span className="text-muted-foreground capitalize">{k}:</span> <span className="font-medium">{v as string}</span></div>
+              <div key={k} className="p-2 rounded-lg bg-background/30"><span className="text-muted-foreground capitalize text-xs block mb-0.5">{k}</span><span className="font-medium text-sm">{v as string}</span></div>
             ))}
           </div>
         </CardContent></Card>
-        <div><h3 className="font-semibold mb-2">Sales Navigator Query</h3><div className="bg-surface border border-border rounded-lg p-3 font-mono text-sm">{data.sales_nav_query}<CopyButton text={data.sales_nav_query} /></div></div>
-        <div><h3 className="font-semibold mb-2">Search Combos</h3>{data.search_combos?.map((s: string, i: number) => <div key={i} className="flex items-center gap-2 mb-1"><p className="text-sm">{s}</p><CopyButton text={s} /></div>)}</div>
-        <div><h3 className="font-semibold mb-2">Messaggi chiave</h3>{data.value_props?.map((v: string, i: number) => <p key={i} className="text-sm text-muted-foreground mb-1">• {v}</p>)}</div>
-        <Link to={`/skill/prospect-finder?icp=${encodeURIComponent(JSON.stringify(data.icp))}`}><Button className="bg-primary hover:bg-primary-hover text-primary-foreground">Cerca prospect con questo ICP <ChevronRight className="ml-1 h-4 w-4" /></Button></Link>
+        <div><h3 className="font-semibold mb-2">Sales Navigator Query</h3><div className="bg-surface/50 border border-border/30 rounded-xl p-4 font-mono text-sm">{data.sales_nav_query}<div className="mt-2"><CopyButton text={data.sales_nav_query} /></div></div></div>
+        <div><h3 className="font-semibold mb-2">Search Combos</h3>{data.search_combos?.map((s: string, i: number) => <div key={i} className="flex items-center gap-2 mb-2 p-3 bg-surface/50 rounded-xl border border-border/30 hover:border-border transition-colors"><p className="text-sm flex-1">{s}</p><CopyButton text={s} /></div>)}</div>
+        <div><h3 className="font-semibold mb-2">Messaggi chiave</h3>{data.value_props?.map((v: string, i: number) => <p key={i} className="text-sm text-muted-foreground mb-1.5 flex items-start gap-2"><span className="text-primary">→</span>{v}</p>)}</div>
+        <Link to={`/skill/prospect-finder?icp=${encodeURIComponent(JSON.stringify(data.icp))}`}>
+          <Button className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg shadow-primary/20">
+            Cerca prospect con questo ICP <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </Link>
       </div>
     );
   }
 
   if (skillId === 'prospect-finder') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 animate-in">
         {data.prospects?.map((p: any, i: number) => (
-          <Card key={i} className="bg-surface border-border"><CardContent className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2"><h3 className="font-semibold text-sm">{p.nome}</h3><ScoreBadge score={p.fit_score} size="sm" /></div>
-                <p className="text-xs text-muted-foreground">{p.headline}</p>
-                <p className="text-xs text-primary mt-1">{p.reason}</p>
-              </div>
-            </div>
-            <div className="mt-3 bg-background/50 rounded-lg p-3 border border-border">
-              <p className="text-sm">{p.connection_request}</p>
-              <div className="flex justify-between items-center mt-2">
-                <CharCounter text={p.connection_request} limit={300} />
-                <div className="flex gap-1">
-                  <CopyButton text={p.connection_request} />
-                  <Link to={`/skill/outreach-drafter?nome=${encodeURIComponent(p.nome)}&headline=${encodeURIComponent(p.headline)}&azienda=${encodeURIComponent(p.azienda)}`}>
-                    <Button variant="ghost" size="sm">Outreach completo <ChevronRight className="h-3 w-3 ml-1" /></Button>
-                  </Link>
+          <Card key={i} className="bg-surface/50 border-border/30 hover:border-border transition-all group" style={{ animationDelay: `${i * 100}ms` }}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3"><h3 className="font-semibold text-sm group-hover:text-primary transition-colors">{p.nome}</h3><ScoreBadge score={p.fit_score} size="sm" /></div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{p.headline}</p>
+                  <p className="text-xs text-primary/70 mt-1">{p.reason}</p>
                 </div>
               </div>
-            </div>
-          </CardContent></Card>
+              <div className="mt-4 bg-background/30 rounded-xl p-4 border border-border/20">
+                <p className="text-sm leading-relaxed">{p.connection_request}</p>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/10">
+                  <CharCounter text={p.connection_request} limit={300} />
+                  <div className="flex gap-1">
+                    <CopyButton text={p.connection_request} />
+                    <Link to={`/skill/outreach-drafter?nome=${encodeURIComponent(p.nome)}&headline=${encodeURIComponent(p.headline)}&azienda=${encodeURIComponent(p.azienda)}`}>
+                      <Button variant="ghost" size="sm" className="hover:text-primary">Outreach completo <ChevronRight className="h-3 w-3 ml-1" /></Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     );
@@ -308,47 +318,53 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
 
   if (skillId === 'outreach-drafter') {
     return (
-      <div className="space-y-6">
-        <div><h3 className="font-semibold mb-3">Connection Request</h3><div className="space-y-2">{data.connection_requests?.map((cr: any) => (
-          <Card key={cr.variant} className="bg-surface border-border"><CardContent className="p-4">
-            <Badge variant="outline" className="mb-2 border-border">{cr.variant}</Badge>
-            <p className="text-sm">{cr.text}</p>
-            <div className="flex justify-between items-center mt-2"><CharCounter text={cr.text} limit={300} /><CopyButton text={cr.text} /></div>
-          </CardContent></Card>
-        ))}</div></div>
-        <div><h3 className="font-semibold mb-3">Primo Messaggio</h3><div className="space-y-2">{data.first_messages?.map((m: any) => (
-          <Card key={m.variant} className="bg-surface border-border"><CardContent className="p-4">
-            <Badge variant="outline" className="mb-2 border-border">{m.variant}</Badge>
-            <p className="text-sm whitespace-pre-wrap">{m.text}</p>
-            <div className="flex justify-between items-center mt-2"><CharCounter text={m.text} limit={500} /><CopyButton text={m.text} /></div>
-          </CardContent></Card>
-        ))}</div></div>
-        <div><h3 className="font-semibold mb-3">Follow-up</h3><div className="space-y-2">{data.followups?.map((f: any) => (
-          <Card key={f.timing} className="bg-surface border-border"><CardContent className="p-4">
-            <Badge variant="outline" className="mb-2 border-border">{f.timing}</Badge>
-            <p className="text-sm">{f.text}</p>
-            <CopyButton text={f.text} />
-          </CardContent></Card>
-        ))}</div></div>
+      <div className="space-y-6 animate-in">
+        {[
+          { title: 'Connection Request', items: data.connection_requests, limit: 300 },
+          { title: 'Primo Messaggio', items: data.first_messages, limit: 500 },
+          { title: 'Follow-up', items: data.followups, limit: 0 },
+        ].map(section => (
+          <div key={section.title}>
+            <h3 className="font-semibold mb-3">{section.title}</h3>
+            <div className="space-y-2">
+              {section.items?.map((item: any) => (
+                <Card key={item.variant || item.timing} className="bg-surface/50 border-border/30 hover:border-border transition-all">
+                  <CardContent className="p-4">
+                    <Badge variant="outline" className="mb-3 border-border/50 text-[10px]">{item.variant || item.timing}</Badge>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{item.text}</p>
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/10">
+                      {section.limit > 0 ? <CharCounter text={item.text} limit={section.limit} /> : <span />}
+                      <CopyButton text={item.text} />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (skillId === 'reply-suggester') {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5 animate-in">
         <div className="flex flex-wrap gap-2">
           {Object.entries(data.classification || {}).map(([k, v]) => (
             <Badge key={k} className="bg-primary/10 text-primary border-0">{k}: {v as string}</Badge>
           ))}
         </div>
-        <div className="space-y-3">{data.replies?.map((r: any) => (
-          <Card key={r.approach} className="bg-surface border-border"><CardContent className="p-4">
-            <Badge className="mb-2 bg-primary-light text-primary border-0">{r.approach}</Badge>
-            <p className="text-sm">{r.text}</p>
-            <p className="text-xs text-primary mt-2">Next step: {r.next_step}</p>
-            <CopyButton text={r.text} />
-          </CardContent></Card>
+        <div className="space-y-3">{data.replies?.map((r: any, i: number) => (
+          <Card key={r.approach} className="bg-surface/50 border-border/30 hover:border-border transition-all" style={{ animationDelay: `${i * 100}ms` }}>
+            <CardContent className="p-5">
+              <Badge className="mb-3 bg-primary/10 text-primary border-0">{r.approach}</Badge>
+              <p className="text-sm leading-relaxed">{r.text}</p>
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/10">
+                <p className="text-xs text-primary/70">Next step: {r.next_step}</p>
+                <CopyButton text={r.text} />
+              </div>
+            </CardContent>
+          </Card>
         ))}</div>
       </div>
     );
@@ -356,47 +372,51 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
 
   if (skillId === 'network-intelligence') {
     const signalColors: Record<string, string> = {
-      promozione: 'bg-layer-profilo/20 text-layer-profilo',
-      post_virale: 'bg-primary/20 text-primary',
-      nuovo_ruolo: 'bg-success/20 text-success',
+      promozione: 'bg-layer-profilo/15 text-layer-profilo',
+      post_virale: 'bg-primary/15 text-primary',
+      nuovo_ruolo: 'bg-success/15 text-success',
     };
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Ultimo check: {new Date(data.last_check).toLocaleDateString('it-IT')}</p>
+      <div className="space-y-4 animate-in">
+        <p className="text-sm text-muted-foreground">Ultimo check: <span className="text-foreground font-medium">{new Date(data.last_check).toLocaleDateString('it-IT')}</span></p>
         {data.signals?.map((s: any, i: number) => (
-          <Card key={i} className="bg-surface border-border"><CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-medium text-sm">{s.nome}</span>
-              <Badge className={signalColors[s.type] || 'bg-muted'}>{s.type.replace('_', ' ')}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">{s.detail}</p>
-            <div className="bg-background/50 rounded-lg p-3 border border-border">
-              <p className="text-sm">{s.message}</p>
-              <CopyButton text={s.message} />
-            </div>
-          </CardContent></Card>
+          <Card key={i} className="bg-surface/50 border-border/30 hover:border-border transition-all" style={{ animationDelay: `${i * 100}ms` }}>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-medium text-sm">{s.nome}</span>
+                <Badge className={signalColors[s.type] || 'bg-muted'}>{s.type.replace('_', ' ')}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">{s.detail}</p>
+              <div className="bg-background/30 rounded-xl p-4 border border-border/20">
+                <p className="text-sm leading-relaxed">{s.message}</p>
+                <div className="mt-2"><CopyButton text={s.message} /></div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
         {data.no_changes?.length > 0 && (
-          <details><summary className="text-sm text-muted-foreground cursor-pointer">Nessun cambiamento ({data.no_changes.length} profili)</summary>
-            <ul className="mt-2 space-y-1">{data.no_changes.map((n: string) => <li key={n} className="text-sm text-muted-foreground">• {n}</li>)}</ul>
+          <details className="group"><summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">Nessun cambiamento ({data.no_changes.length} profili)</summary>
+            <ul className="mt-2 space-y-1 animate-in">{data.no_changes.map((n: string) => <li key={n} className="text-sm text-muted-foreground">• {n}</li>)}</ul>
           </details>
         )}
-        <Link to="/watchlist"><Button variant="outline" className="border-border">Gestisci watchlist</Button></Link>
+        <Link to="/watchlist"><Button variant="outline" className="border-border/50 hover:border-primary/50 hover:text-primary transition-all">Gestisci watchlist</Button></Link>
       </div>
     );
   }
 
   // Fallback: auto-profile-setup
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 animate-in">
       {Object.entries(data).map(([k, v]) => (
-        <div key={k}><span className="text-sm text-muted-foreground capitalize">{k.replace(/_/g, ' ')}:</span> <span className="text-sm font-medium">{String(v)}</span></div>
+        <div key={k} className="p-3 bg-surface/50 rounded-xl border border-border/30">
+          <span className="text-xs text-muted-foreground capitalize block mb-0.5">{k.replace(/_/g, ' ')}</span>
+          <span className="text-sm font-medium">{String(v)}</span>
+        </div>
       ))}
     </div>
   );
 }
 
-// Skill form per ogni skill
 function SkillForm({ skillId, onSubmit }: { skillId: string; onSubmit: (data: Record<string, string>) => void }) {
   const [searchParams] = useSearchParams();
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -416,28 +436,36 @@ function SkillForm({ skillId, onSubmit }: { skillId: string; onSubmit: (data: Re
 
   const set = (k: string, v: string) => setValues(prev => ({ ...prev, [k]: v }));
 
+  const submitBtn = (
+    <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
+      <Sparkles className="h-4 w-4 mr-2" /> Genera
+    </Button>
+  );
+
   if (skillId === 'auto-profile-setup') {
     return (
       <div className="space-y-4">
-        <Input placeholder="https://www.linkedin.com/in/tuoprofilo" value={values.url || ''} onChange={e => set('url', e.target.value)} className="bg-surface border-border" />
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        <Input placeholder="https://www.linkedin.com/in/tuoprofilo" value={values.url || ''} onChange={e => set('url', e.target.value)} className="bg-surface border-border/50 focus:border-primary h-11" />
+        {submitBtn}
       </div>
     );
   }
 
   if (skillId === 'profile-optimizer') {
-    return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Lancia audit</Button>;
+    return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20"><Sparkles className="h-4 w-4 mr-2" /> Lancia audit</Button>;
   }
 
   if (skillId === 'post-writer') {
     return (
       <div className="space-y-4">
-        <Textarea placeholder="Descrivi il post che vuoi scrivere..." value={values.brief || ''} onChange={e => set('brief', e.target.value)} className="bg-surface border-border" rows={4} />
+        <div className="group">
+          <Textarea placeholder="Descrivi il post che vuoi scrivere..." value={values.brief || ''} onChange={e => set('brief', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={4} />
+        </div>
         <Select value={values.format || 'Storytelling'} onValueChange={v => set('format', v)}>
-          <SelectTrigger className="bg-surface border-border"><SelectValue placeholder="Formato" /></SelectTrigger>
+          <SelectTrigger className="bg-surface border-border/50"><SelectValue placeholder="Formato" /></SelectTrigger>
           <SelectContent><SelectItem value="Storytelling">Storytelling</SelectItem><SelectItem value="Insight">Insight</SelectItem><SelectItem value="Case Study">Case Study</SelectItem><SelectItem value="Polarizzante">Polarizzante</SelectItem></SelectContent>
         </Select>
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        {submitBtn}
       </div>
     );
   }
@@ -445,26 +473,26 @@ function SkillForm({ skillId, onSubmit }: { skillId: string; onSubmit: (data: Re
   if (skillId === 'visual-post-builder') {
     return (
       <div className="space-y-4">
-        <Textarea placeholder="Incolla il testo del post..." value={values.post || ''} onChange={e => set('post', e.target.value)} className="bg-surface border-border" rows={4} />
+        <Textarea placeholder="Incolla il testo del post..." value={values.post || ''} onChange={e => set('post', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={4} />
         <Select value={values.style || 'Minimal'} onValueChange={v => set('style', v)}>
-          <SelectTrigger className="bg-surface border-border"><SelectValue placeholder="Stile" /></SelectTrigger>
+          <SelectTrigger className="bg-surface border-border/50"><SelectValue placeholder="Stile" /></SelectTrigger>
           <SelectContent><SelectItem value="Minimal">Minimal</SelectItem><SelectItem value="Bold">Bold</SelectItem><SelectItem value="Data Viz">Data Viz</SelectItem><SelectItem value="Storytelling">Storytelling</SelectItem></SelectContent>
         </Select>
-        <Input placeholder="Colori brand (es. #D97706, #0F172A)" value={values.colors || ''} onChange={e => set('colors', e.target.value)} className="bg-surface border-border" />
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        <Input placeholder="Colori brand (es. #D97706, #0F172A)" value={values.colors || ''} onChange={e => set('colors', e.target.value)} className="bg-surface border-border/50 focus:border-primary h-11" />
+        {submitBtn}
       </div>
     );
   }
 
   if (skillId === 'content-performance') {
-    return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Analizza i miei post</Button>;
+    return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20"><Sparkles className="h-4 w-4 mr-2" /> Analizza i miei post</Button>;
   }
 
   if (skillId === 'icp-builder') {
     return (
       <div className="space-y-4">
-        <Textarea placeholder="Descrivi il tuo cliente ideale..." value={values.description || ''} onChange={e => set('description', e.target.value)} className="bg-surface border-border" rows={4} />
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        <Textarea placeholder="Descrivi il tuo cliente ideale..." value={values.description || ''} onChange={e => set('description', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={4} />
+        {submitBtn}
       </div>
     );
   }
@@ -472,8 +500,8 @@ function SkillForm({ skillId, onSubmit }: { skillId: string; onSubmit: (data: Re
   if (skillId === 'prospect-finder') {
     return (
       <div className="space-y-4">
-        <Textarea placeholder="Chi cerchi? Descrivi il profilo ideale..." value={values.query || ''} onChange={e => set('query', e.target.value)} className="bg-surface border-border" rows={3} />
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        <Textarea placeholder="Chi cerchi? Descrivi il profilo ideale..." value={values.query || ''} onChange={e => set('query', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={3} />
+        {submitBtn}
       </div>
     );
   }
@@ -481,11 +509,11 @@ function SkillForm({ skillId, onSubmit }: { skillId: string; onSubmit: (data: Re
   if (skillId === 'outreach-drafter') {
     return (
       <div className="space-y-4">
-        <Input placeholder="Nome" value={values.nome || ''} onChange={e => set('nome', e.target.value)} className="bg-surface border-border" />
-        <Input placeholder="Headline" value={values.headline || ''} onChange={e => set('headline', e.target.value)} className="bg-surface border-border" />
-        <Input placeholder="Azienda" value={values.azienda || ''} onChange={e => set('azienda', e.target.value)} className="bg-surface border-border" />
-        <Textarea placeholder="Note aggiuntive (opzionale)" value={values.note || ''} onChange={e => set('note', e.target.value)} className="bg-surface border-border" rows={2} />
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        <Input placeholder="Nome" value={values.nome || ''} onChange={e => set('nome', e.target.value)} className="bg-surface border-border/50 focus:border-primary h-11" />
+        <Input placeholder="Headline" value={values.headline || ''} onChange={e => set('headline', e.target.value)} className="bg-surface border-border/50 focus:border-primary h-11" />
+        <Input placeholder="Azienda" value={values.azienda || ''} onChange={e => set('azienda', e.target.value)} className="bg-surface border-border/50 focus:border-primary h-11" />
+        <Textarea placeholder="Note aggiuntive (opzionale)" value={values.note || ''} onChange={e => set('note', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={2} />
+        {submitBtn}
       </div>
     );
   }
@@ -493,18 +521,18 @@ function SkillForm({ skillId, onSubmit }: { skillId: string; onSubmit: (data: Re
   if (skillId === 'reply-suggester') {
     return (
       <div className="space-y-4">
-        <Textarea placeholder="Incolla il messaggio ricevuto..." value={values.message || ''} onChange={e => set('message', e.target.value)} className="bg-surface border-border" rows={4} />
-        <Textarea placeholder="Contesto (opzionale)" value={values.context || ''} onChange={e => set('context', e.target.value)} className="bg-surface border-border" rows={2} />
-        <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>
+        <Textarea placeholder="Incolla il messaggio ricevuto..." value={values.message || ''} onChange={e => set('message', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={4} />
+        <Textarea placeholder="Contesto (opzionale)" value={values.context || ''} onChange={e => set('context', e.target.value)} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={2} />
+        {submitBtn}
       </div>
     );
   }
 
   if (skillId === 'network-intelligence') {
-    return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Aggiorna ora</Button>;
+    return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20"><Sparkles className="h-4 w-4 mr-2" /> Aggiorna ora</Button>;
   }
 
-  return <Button onClick={() => onSubmit(values)} className="w-full bg-primary hover:bg-primary-hover text-primary-foreground">Genera</Button>;
+  return submitBtn;
 }
 
 export default function SkillPage() {
@@ -514,7 +542,7 @@ export default function SkillPage() {
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (!skill) return <AppLayout><p>Skill non trovata.</p></AppLayout>;
+  if (!skill) return <AppLayout><div className="text-center py-16"><p className="text-muted-foreground">Skill non trovata.</p></div></AppLayout>;
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -530,9 +558,9 @@ export default function SkillPage() {
     <AppLayout>
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <SkillIcon name={skill.icon} className="h-6 w-6 text-primary" />
+        <div className="flex items-start gap-4 animate-in">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+            <SkillIcon name={skill.icon} className="h-7 w-7 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold">{skill.name}</h1>
@@ -541,12 +569,12 @@ export default function SkillPage() {
         </div>
 
         {/* Form */}
-        <Card className="bg-card border-border">
+        <Card className="bg-card/80 border-border/50 backdrop-blur-sm animate-in animate-in-delay-1">
           <CardContent className="p-6">
             <SkillForm skillId={skill.id} onSubmit={handleSubmit} />
             {skill.usesScraping && (
-              <p className="text-xs text-warning mt-3">
-                ⚡ Usa 1 credito scraping ({scrapingRemaining} rimasti oggi)
+              <p className="text-xs text-warning mt-3 flex items-center gap-1">
+                ⚡ Usa 1 credito scraping <span className="text-muted-foreground">({scrapingRemaining} rimasti oggi)</span>
               </p>
             )}
           </CardContent>
@@ -554,24 +582,28 @@ export default function SkillPage() {
 
         {/* Loading */}
         {loading && (
-          <div className="text-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Ember sta lavorando...</p>
-            <p className="text-xs text-muted mt-1">Tempo stimato: 15-30 secondi</p>
+          <div className="text-center py-16 animate-in">
+            <div className="relative inline-block">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <div className="absolute inset-0 h-10 w-10 rounded-full animate-ping bg-primary/10" />
+            </div>
+            <p className="text-foreground font-medium mt-6">Ember sta lavorando...</p>
+            <p className="text-xs text-muted-foreground mt-1">Tempo stimato: 15-30 secondi</p>
           </div>
         )}
 
         {/* Output */}
         {output && !loading && (
-          <Card className="bg-card border-border">
+          <Card className="bg-card/80 border-border/50 backdrop-blur-sm animate-in">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold">Risultato</h2>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleSubmit}>
-                    <RefreshCw className="h-3 w-3 mr-1" /> Rigenera
-                  </Button>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h2 className="font-semibold">Risultato</h2>
                 </div>
+                <Button variant="ghost" size="sm" onClick={handleSubmit} className="hover:text-primary transition-colors">
+                  <RefreshCw className="h-3 w-3 mr-1" /> Rigenera
+                </Button>
               </div>
               <SkillOutput skillId={skill.id} output={output} />
             </CardContent>
