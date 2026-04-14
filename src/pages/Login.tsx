@@ -3,15 +3,36 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mail, CheckCircle } from "lucide-react";
+import { Mail, CheckCircle, Loader2, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) setSent(true);
+    if (!email) return;
+
+    setLoading(true);
+    setError(null);
+
+    const { error: authError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
+    } else {
+      setSent(true);
+    }
   };
 
   return (
@@ -40,10 +61,27 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-surface border-border/50 focus:border-primary h-12 text-base"
                 required
+                disabled={loading}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-12 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
-                <Mail className="mr-2 h-4 w-4" />
-                Invia magic link
+
+              {error && (
+                <div className="flex items-center gap-2 text-destructive text-sm">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-12 text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+              >
+                {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                {loading ? "Invio in corso..." : "Invia magic link"}
               </Button>
             </form>
           ) : (
