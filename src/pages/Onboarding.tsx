@@ -10,14 +10,19 @@ import { ScoreBadge } from "@/components/ScoreBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ChevronRight, Link as LinkIcon, CheckCircle, Sparkles } from "lucide-react";
 import { mockBusinessProfile } from "@/lib/mock-data";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const stepLabels = ['LinkedIn URL', 'Business Profile', 'Risultato'];
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(mockBusinessProfile);
   const [urlError, setUrlError] = useState("");
 
@@ -35,7 +40,31 @@ export default function Onboarding() {
     setStep(2);
   };
 
-  const handleConfirm = () => setStep(3);
+  const handleConfirm = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          display_name: profile.nome,
+          company_name: profile.headline,
+          linkedin_url: linkedinUrl,
+          industry: profile.settore,
+          target_audience: profile.value_proposition,
+          role: profile.tone_of_voice,
+          onboarding_completed: true,
+        })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      setStep(3);
+    } catch (err: any) {
+      toast.error("Errore nel salvataggio del profilo: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
@@ -171,8 +200,8 @@ export default function Onboarding() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <Button onClick={handleConfirm} className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20">
-                    Conferma <ChevronRight className="ml-1 h-4 w-4" />
+                  <Button onClick={handleConfirm} disabled={saving} className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20">
+                    {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvataggio...</> : <>Conferma <ChevronRight className="ml-1 h-4 w-4" /></>}
                   </Button>
                   <Button variant="outline" onClick={() => setStep(1)} className="border-border/50 hover:bg-surface">
                     Rigenera
