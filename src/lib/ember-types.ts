@@ -1,6 +1,6 @@
 export type SkillId =
   | 'auto-profile-setup'
-  | 'profile-optimizer'
+  
   | 'post-writer'
   | 'visual-post-builder'
   | 'content-performance'
