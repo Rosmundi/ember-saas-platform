@@ -659,7 +659,7 @@ export default function SkillPage() {
       });
       await consumeSkillRun(skill.usesScraping);
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
-    } else {
+    } else if (result.ok === false) {
       const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
