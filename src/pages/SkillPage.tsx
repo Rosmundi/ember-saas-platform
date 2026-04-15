@@ -473,6 +473,34 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
     );
   }
 
+  if (skillId === 'auto-profile-setup') {
+    const pb = data.profilo_business as any || {};
+    const tb = data.target_buyer as any || {};
+    const hooks = (data.hook_editoriali || []) as string[];
+    return (
+      <div className="space-y-6 animate-in">
+        <div>
+          <h3 className="text-xl font-bold">{pb.nome}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{pb.chi_e}</p>
+          {pb.settore && <Badge className="bg-primary/10 text-primary border-0 mt-2">{pb.settore}</Badge>}
+        </div>
+        {pb.offerta && <div><h4 className="font-semibold text-sm mb-1">Offerta</h4><p className="text-sm text-muted-foreground">{pb.offerta}</p></div>}
+        {pb.unique_value && <div><h4 className="font-semibold text-sm mb-1">Unique Value</h4><p className="text-sm text-muted-foreground">{pb.unique_value}</p></div>}
+        {tb.descrizione && <div><h4 className="font-semibold text-sm mb-1">Target Buyer</h4><p className="text-sm text-muted-foreground">{tb.descrizione}</p>
+          {tb.pain_points && <div className="mt-2 space-y-1">{tb.pain_points.map((p: string, i: number) => <p key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-primary">•</span>{p}</p>)}</div>}
+        </div>}
+        {hooks.length > 0 && <div><h4 className="font-semibold text-sm mb-2">Hook editoriali</h4>
+          {hooks.map((h: string, i: number) => (
+            <Card key={i} className="bg-surface/50 border-border/30 mb-2"><CardContent className="p-4">
+              <p className="text-sm">{h}</p>
+              <div className="mt-2"><CopyButton text={h} /></div>
+            </CardContent></Card>
+          ))}
+        </div>}
+      </div>
+    );
+  }
+
   // Fallback generico: mostra JSON formattato
   return (
     <div className="space-y-3 animate-in">
