@@ -48,19 +48,18 @@ export default function Onboarding() {
     }
 
     const d = result.data as Record<string, unknown>;
-    const pb = d.profilo_business as Record<string, unknown> || {};
-    const tb = d.target_buyer as Record<string, unknown> || {};
+    const pb = d.profilo_business as Record<string, string> || {};
     const hooks = (d.hook_editoriali || []) as string[];
 
     setBp({
-      nome: pb.chi_e as string || "",
-      headline: `${pb.settore || ""} | ${pb.offerta || ""}`.slice(0, 220),
-      settore: pb.settore as string || "",
+      nome: pb.nome || pb.chi_e || "",
+      headline: pb.chi_e || "",
+      settore: pb.settore || "",
       value_proposition: [pb.offerta, pb.unique_value].filter(Boolean).join(". "),
       tone_of_voice: "Diretto e pratico",
       punti_forza: hooks.length > 0 ? hooks : ["Da definire"],
       aree_miglioramento: [],
-      tags: (pb.settore as string || "").split(/[,\/\s]+/).filter((t: string) => t.length > 2),
+      tags: (pb.settore || "").split(/[,\/\s]+/).filter((t: string) => t.length > 2),
     });
 
     setRawData(d);
@@ -222,16 +221,14 @@ export default function Onboarding() {
               <div className="text-center space-y-4">
                 <h2 className="text-xl font-bold">Il tuo profilo LinkedIn in sintesi</h2>
                 <p className="text-muted-foreground text-sm">Ecco come si posiziona il tuo profilo. Puoi migliorarlo subito o dopo.</p>
-                <ScoreBadge score={72} size="lg" className="mx-auto" />
-                <p className="text-xs text-muted-foreground">Punteggio stimato — lancia l'audit completo per un'analisi dettagliata</p>
+                <ScoreBadge score={(rawData?.score_totale as number) || 0} size="lg" className="mx-auto" />
+                <p className="text-xs text-muted-foreground">Basato sull'analisi di 10 sezioni del tuo profilo LinkedIn</p>
               </div>
 
               <div className="space-y-3">
-                {[
-                  "Riscrivi la sezione About con struttura problem-solution-proof",
-                  "Aggiungi almeno 3 contenuti nella sezione Featured",
-                  "Ottimizza la headline con keyword del tuo ICP",
-                ].map((action, i) => (
+                {((rawData?.azioni_prioritarie as string[]) || [
+                  "Completa l'analisi del profilo per ricevere suggerimenti personalizzati",
+                ]).map((action, i) => (
                   <div key={i} className="flex items-start gap-3 p-3 bg-surface/50 rounded-xl border border-border/30">
                     <span className="text-primary font-bold">{i + 1}</span>
                     <p className="text-sm">{action}</p>
@@ -241,11 +238,11 @@ export default function Onboarding() {
 
               <div className="flex gap-3">
                 <Button
-                  onClick={() => navigate("/skill/profile-optimizer")}
+                  onClick={() => navigate("/skill/auto-profile-setup")}
                   variant="outline"
                   className="flex-1 border-border/50 hover:border-primary/50"
                 >
-                  Vedi audit completo
+                  Vedi analisi dettagliata
                 </Button>
                 <Button
                   onClick={() => navigate("/dashboard")}
