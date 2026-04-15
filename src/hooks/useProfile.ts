@@ -78,7 +78,7 @@ export function useProfile() {
     if (!user) return;
     const { error: err } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(updates as any)
       .eq('user_id', user.id);
     if (err) { setError(err.message); return; }
     await fetchProfile();
