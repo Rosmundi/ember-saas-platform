@@ -42,7 +42,7 @@ export default function Onboarding() {
 
     setLoading(false);
 
-    if (!result.ok) {
+    if (result.ok === false) {
       toast.error(emberErrorMessage(result.error));
       return;
     }
