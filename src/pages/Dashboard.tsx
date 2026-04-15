@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { QuotaBar } from "@/components/QuotaBar";
 import { SkillIcon } from "@/components/SkillIcon";
-import { AlertTriangle, ChevronRight, Clock, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, Clock, Loader2, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -70,6 +70,48 @@ export default function Dashboard() {
           <QuotaBar label="Skill-run" used={profile.skill_runs_used} total={profile.skill_runs_limit} />
           <QuotaBar label="Scraping oggi" used={profile.scrapes_used_today} total={profile.scrapes_daily_limit} />
         </div>
+
+        {/* Profilo fisso */}
+        {profile.business_profile && (
+          <Card className="bg-card/80 border-border/50 animate-in">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <UserCheck className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold">{(profile.business_profile as any).nome || "Il tuo profilo"}</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{(profile.business_profile as any).chi_e || (profile.business_profile as any).headline || ""}</p>
+                    {(profile.business_profile as any).settore && (
+                      <Badge className="bg-primary/10 text-primary border-0 mt-2 text-xs">{(profile.business_profile as any).settore}</Badge>
+                    )}
+                  </div>
+                </div>
+                <Link to="/skill/auto-profile-setup">
+                  <Button variant="ghost" size="sm" className="hover:text-primary transition-colors text-xs">
+                    Rianalizza <ChevronRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              </div>
+              {profile.raw_profile_data?.score_totale != null && (
+                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border/30">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
+                    (profile.raw_profile_data.score_totale as number) >= 70 ? 'bg-emerald-500/15 text-emerald-400' :
+                    (profile.raw_profile_data.score_totale as number) >= 50 ? 'bg-amber-500/15 text-amber-400' :
+                    'bg-destructive/15 text-destructive'
+                  }`}>
+                    {profile.raw_profile_data.score_totale as number}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium">LinkedIn Score</p>
+                    <p className="text-xs text-muted-foreground">{(profile.raw_profile_data.livello as string) || ""} — {profile.raw_profile_data.sintesi ? (profile.raw_profile_data.sintesi as string).slice(0, 100) + "..." : "Analizza il profilo per vedere il dettaglio"}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Trial expired banner */}
         {trialExpired && (

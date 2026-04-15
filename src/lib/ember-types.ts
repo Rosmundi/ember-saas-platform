@@ -69,8 +69,7 @@ export interface SkillConfig {
 }
 
 export const SKILLS: SkillConfig[] = [
-  { id: 'auto-profile-setup', name: 'Profilo automatico', icon: 'UserCheck', description: 'Incolla il tuo LinkedIn URL, il profilo business si compila da solo.', layer: 'profilo', usesScraping: true, plans: ['trial', 'base', 'pro', 'studio'] },
-  { id: 'profile-optimizer', name: 'Ottimizza profilo', icon: 'Award', description: 'Audit completo del tuo profilo con score 0-100 e riscritture pronte da copiare.', layer: 'profilo', usesScraping: false, plans: ['trial', 'base', 'pro', 'studio'] },
+  { id: 'auto-profile-setup', name: 'Analizza profilo', icon: 'UserCheck', description: 'Analisi completa del tuo profilo LinkedIn con score 0-100, audit per sezione e riscritture pronte da copiare.', layer: 'profilo', usesScraping: true, plans: ['trial', 'base', 'pro', 'studio'] },
   { id: 'post-writer', name: 'Scrivi un post', icon: 'PenTool', description: 'Post LinkedIn in italiano: storytelling, insight, case study o provocazione.', layer: 'content', usesScraping: false, plans: ['trial', 'base', 'pro', 'studio'] },
   { id: 'visual-post-builder', name: 'Crea il visual', icon: 'Image', description: 'Specifiche per Canva e prompt AI per le immagini del post.', layer: 'content', usesScraping: false, plans: ['trial', 'base', 'pro', 'studio'] },
   { id: 'content-performance', name: 'Analizza i contenuti', icon: 'BarChart3', description: 'Report settimanale: cosa funziona, cosa no, pattern e raccomandazioni.', layer: 'content', usesScraping: true, plans: ['pro', 'studio'] },
