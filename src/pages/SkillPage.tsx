@@ -477,26 +477,177 @@ function SkillOutput({ skillId, output }: { skillId: string; output: Record<stri
     const pb = data.profilo_business as any || {};
     const tb = data.target_buyer as any || {};
     const hooks = (data.hook_editoriali || []) as string[];
+    const sezioni = (data.sezioni || []) as any[];
+    const azioni = (data.azioni_prioritarie || []) as string[];
+
+    const getScoreColor = (score: number) => {
+      if (score >= 80) return 'text-emerald-400';
+      if (score >= 60) return 'text-amber-400';
+      if (score >= 40) return 'text-orange-400';
+      return 'text-destructive';
+    };
+
+    const getScoreBg = (score: number) => {
+      if (score >= 80) return 'bg-emerald-500/15 border-emerald-500/30';
+      if (score >= 60) return 'bg-amber-500/15 border-amber-500/30';
+      if (score >= 40) return 'bg-orange-500/15 border-orange-500/30';
+      return 'bg-destructive/15 border-destructive/30';
+    };
+
+    const getStatoBadge = (stato: string) => {
+      if (stato?.includes('assente') || stato === 'inattivo') return 'bg-destructive/15 text-destructive';
+      if (stato?.includes('generi') || stato?.includes('debole') || stato?.includes('solo_') || stato === 'sporadico' || stato?.includes('parziale') || stato?.includes('poche')) return 'bg-amber-500/15 text-amber-400';
+      return 'bg-emerald-500/15 text-emerald-400';
+    };
+
     return (
-      <div className="space-y-6 animate-in">
-        <div>
-          <h3 className="text-xl font-bold">{pb.nome}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{pb.chi_e}</p>
-          {pb.settore && <Badge className="bg-primary/10 text-primary border-0 mt-2">{pb.settore}</Badge>}
-        </div>
-        {pb.offerta && <div><h4 className="font-semibold text-sm mb-1">Offerta</h4><p className="text-sm text-muted-foreground">{pb.offerta}</p></div>}
-        {pb.unique_value && <div><h4 className="font-semibold text-sm mb-1">Unique Value</h4><p className="text-sm text-muted-foreground">{pb.unique_value}</p></div>}
-        {tb.descrizione && <div><h4 className="font-semibold text-sm mb-1">Target Buyer</h4><p className="text-sm text-muted-foreground">{tb.descrizione}</p>
-          {tb.pain_points && <div className="mt-2 space-y-1">{tb.pain_points.map((p: string, i: number) => <p key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-primary">•</span>{p}</p>)}</div>}
-        </div>}
-        {hooks.length > 0 && <div><h4 className="font-semibold text-sm mb-2">Hook editoriali</h4>
-          {hooks.map((h: string, i: number) => (
-            <Card key={i} className="bg-surface/50 border-border/30 mb-2"><CardContent className="p-4">
-              <p className="text-sm">{h}</p>
-              <div className="mt-2"><CopyButton text={h} /></div>
-            </CardContent></Card>
-          ))}
-        </div>}
+      <div className="space-y-8 animate-in">
+        {/* Score totale */}
+        {data.score_totale != null && (
+          <div className="text-center py-6">
+            <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full border-4 ${getScoreBg(data.score_totale as number)}`}>
+              <span className={`text-3xl font-bold ${getScoreColor(data.score_totale as number)}`}>{data.score_totale}</span>
+            </div>
+            {data.livello && <p className="text-sm font-medium mt-3">{data.livello as string}</p>}
+            {data.sintesi && <p className="text-sm text-muted-foreground mt-1 max-w-lg mx-auto">{data.sintesi as string}</p>}
+          </div>
+        )}
+
+        {/* Azioni prioritarie */}
+        {azioni.length > 0 && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-5">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">🎯 Da fare subito</h3>
+            <div className="space-y-2">
+              {azioni.map((a: string, i: number) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+                  <p className="text-sm">{a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Score per sezione */}
+        {sezioni.length > 0 && (
+          <div>
+            <h3 className="font-semibold mb-4">Analisi per sezione</h3>
+            <div className="space-y-3">
+              {sezioni.map((s: any, i: number) => (
+                <details key={s.nome || i} className="group">
+                  <summary className="cursor-pointer list-none">
+                    <Card className={`border ${s.score >= 70 ? 'border-border/30' : getScoreBg(s.score)} hover:border-border transition-all`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${getScoreBg(s.score)}`}>
+                              <span className={getScoreColor(s.score)}>{s.score}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium text-sm">{s.nome}</span>
+                              {s.stato && <Badge className={`ml-2 text-[10px] border-0 ${getStatoBadge(s.stato)}`}>{s.stato.replace(/_/g, ' ')}</Badge>}
+                            </div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-open:rotate-90 transition-transform" />
+                        </div>
+                        {s.problema && <p className="text-xs text-muted-foreground mt-2 ml-[52px]">{s.problema}</p>}
+                      </CardContent>
+                    </Card>
+                  </summary>
+                  <div className="ml-4 mt-2 space-y-3 animate-in">
+                    {s.azione && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+                        <p className="text-xs font-medium text-primary mb-1">Cosa fare</p>
+                        <p className="text-sm">{s.azione}</p>
+                      </div>
+                    )}
+                    {s.guida && (
+                      <div className="bg-surface/50 border border-border/30 rounded-xl p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Come farlo su LinkedIn</p>
+                        <p className="text-sm text-muted-foreground">{s.guida}</p>
+                      </div>
+                    )}
+                    {s.riscrittura && (
+                      <div className="bg-surface/50 border border-border/30 rounded-xl p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Testo riscritto</p>
+                        {Array.isArray(s.riscrittura) ? (
+                          s.riscrittura.map((r: string, ri: number) => (
+                            <div key={ri} className="mb-2 last:mb-0">
+                              <p className="text-sm whitespace-pre-wrap">{r}</p>
+                              <CopyButton text={r} />
+                            </div>
+                          ))
+                        ) : (
+                          <div>
+                            <pre className="text-sm whitespace-pre-wrap leading-relaxed">{s.riscrittura}</pre>
+                            <div className="mt-2"><CopyButton text={s.riscrittura} /></div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {s.skills_suggerite && (
+                      <div className="flex flex-wrap gap-2">
+                        {s.skills_suggerite.map((sk: string) => (
+                          <Badge key={sk} className="bg-primary/10 text-primary border-0 cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => { navigator.clipboard.writeText(sk); toast.success("Copiato!"); }}>{sk}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Business Profile */}
+        {pb.nome && (
+          <div>
+            <h3 className="font-semibold mb-3">Business Profile</h3>
+            <Card className="bg-surface/50 border-border/30">
+              <CardContent className="p-5 space-y-3">
+                <div><span className="text-xs text-muted-foreground block">Nome</span><span className="text-sm font-medium">{pb.nome}</span></div>
+                <div><span className="text-xs text-muted-foreground block">Chi è</span><span className="text-sm">{pb.chi_e}</span></div>
+                <div><span className="text-xs text-muted-foreground block">Settore</span><Badge className="bg-primary/10 text-primary border-0">{pb.settore}</Badge></div>
+                <div><span className="text-xs text-muted-foreground block">Offerta</span><span className="text-sm">{pb.offerta}</span></div>
+                <div><span className="text-xs text-muted-foreground block">Unique Value</span><span className="text-sm">{pb.unique_value}</span></div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Target Buyer */}
+        {tb.descrizione && (
+          <div>
+            <h3 className="font-semibold mb-3">Target Buyer</h3>
+            <Card className="bg-surface/50 border-border/30">
+              <CardContent className="p-5">
+                <p className="text-sm mb-3">{tb.descrizione}</p>
+                {tb.pain_points && (
+                  <div className="space-y-1">
+                    {tb.pain_points.map((p: string, i: number) => (
+                      <p key={i} className="text-sm text-muted-foreground flex items-start gap-2"><span className="text-primary">•</span>{p}</p>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Hook editoriali */}
+        {hooks.length > 0 && (
+          <div>
+            <h3 className="font-semibold mb-3">Hook editoriali</h3>
+            {hooks.map((h: string, i: number) => (
+              <Card key={i} className="bg-surface/50 border-border/30 mb-2">
+                <CardContent className="p-4">
+                  <p className="text-sm">{h}</p>
+                  <div className="mt-2"><CopyButton text={h} /></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
