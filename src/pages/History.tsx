@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SKILLS } from "@/lib/ember-types";
-import { mockSkillRuns } from "@/lib/mock-data";
-import { Copy, RefreshCw, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { useSkillRuns } from "@/hooks/useSkillRuns";
+import { Copy, RefreshCw, ChevronDown, ChevronUp, Clock, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { toast } from "sonner";
@@ -20,8 +20,9 @@ const layerBadgeColors: Record<string, string> = {
 export default function History() {
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { runs: allRuns, loading } = useSkillRuns(50);
 
-  const runs = filter === 'all' ? mockSkillRuns : mockSkillRuns.filter(r => r.skill === filter);
+  const runs = filter === 'all' ? allRuns : allRuns.filter(r => r.skill === filter);
 
   return (
     <AppLayout>
@@ -45,7 +46,11 @@ export default function History() {
           </Select>
         </div>
 
-        {runs.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : runs.length === 0 ? (
           <div className="text-center py-16 bg-card/30 rounded-xl border border-dashed border-border/50 animate-in">
             <Clock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">Nessun risultato. Prova una skill dalla dashboard!</p>
@@ -64,7 +69,7 @@ export default function History() {
                   style={{ animationDelay: `${i * 50}ms` }}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <Badge className={`text-[10px] ${layerBadgeColors[skill?.layer || 'profilo']}`}>{skill?.name}</Badge>
+                      <Badge className={`text-[10px] ${layerBadgeColors[skill?.layer || 'profilo']}`}>{skill?.name || run.skill}</Badge>
                       {run.is_scrape && <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">⚡ Scraping</Badge>}
                       <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(run.created_at), 'd MMM yyyy, HH:mm', { locale: it })}</span>
                       <p className="text-xs text-muted-foreground flex-1 truncate">{inputPreview}</p>
