@@ -660,8 +660,7 @@ export default function SkillPage() {
       await consumeSkillRun(skill.usesScraping);
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const errResult = result as { ok: false; error: { type: string; message: string; detail?: string } };
-      const msg = emberErrorMessage(errResult.error);
+      const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -670,7 +669,7 @@ export default function SkillPage() {
         output: null,
         status: 'error',
         is_scrape: false,
-        error_message: errResult.error.message,
+        error_message: result.error.message,
       });
     }
 
