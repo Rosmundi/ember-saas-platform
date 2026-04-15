@@ -644,7 +644,7 @@ export default function SkillPage() {
     setOutput(null);
     setError(null);
 
-    const payload = buildPayload(skill.id, formValues, profile.business_profile as Record<string, unknown> | null, user.id);
+    const payload = buildPayload(skill.id, formValues, profile.business_profile as unknown as Record<string, unknown> | null, user.id);
     const result = await callSkill(skill.id, payload);
 
     if (result.ok) {
@@ -660,7 +660,8 @@ export default function SkillPage() {
       await consumeSkillRun(skill.usesScraping);
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const msg = emberErrorMessage(result.error);
+      const errResult = result as { ok: false; error: { type: string; message: string; detail?: string } };
+      const msg = emberErrorMessage(errResult.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -669,7 +670,7 @@ export default function SkillPage() {
         output: null,
         status: 'error',
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: errResult.error.message,
       });
     }
 
