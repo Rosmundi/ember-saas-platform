@@ -94,8 +94,8 @@ export function useProfile() {
       .from('profiles')
       .update({
         linkedin_url: linkedinUrl,
-        business_profile: businessProfile as unknown as Record<string, unknown>,
-        raw_profile_data: rawData,
+        business_profile: businessProfile as any,
+        raw_profile_data: rawData as any,
         onboarding_completed: true,
       })
       .eq('user_id', user.id);
