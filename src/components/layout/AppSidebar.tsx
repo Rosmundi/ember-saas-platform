@@ -2,7 +2,7 @@ import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { SkillIcon } from "@/components/SkillIcon";
 import { SKILLS } from "@/lib/ember-types";
-import { mockProfile } from "@/lib/mock-data";
+import { useProfile } from "@/hooks/useProfile";
 import {
   LayoutDashboard, Clock, Radar, Settings, LogOut,
 } from "lucide-react";
@@ -30,8 +30,10 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const profile = mockProfile;
-  const planLabel = profile.plan.charAt(0).toUpperCase() + profile.plan.slice(1);
+  const { profile } = useProfile();
+  const plan = profile?.plan || 'trial';
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const nome = (profile?.business_profile as any)?.nome || 'Utente';
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50 bg-surface">
@@ -82,7 +84,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {layer.skills.map((skill) => {
-                  const available = skill.plans.includes(profile.plan);
+                  const available = skill.plans.includes(plan);
                   return (
                     <SidebarMenuItem key={skill.id}>
                       <SidebarMenuButton asChild>
@@ -116,11 +118,11 @@ export function AppSidebar() {
       <SidebarFooter className="bg-card border-t border-border/30 p-4">
         <div className="flex items-center gap-3 group">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center text-primary-foreground text-sm font-bold shadow-lg group-hover:shadow-primary/20 transition-shadow">
-            {profile.business_profile?.nome?.charAt(0) || 'U'}
+            {nome.charAt(0)}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{profile.business_profile?.nome || 'Utente'}</p>
+              <p className="text-sm font-medium truncate">{nome}</p>
               <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-primary/50 text-primary mt-0.5">
                 {planLabel}
               </Badge>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,17 +8,39 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { QuotaBar } from "@/components/QuotaBar";
-import { mockProfile, mockBusinessProfile } from "@/lib/mock-data";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/contexts/AuthContext";
 import { PLAN_LIMITS } from "@/lib/ember-types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { LogOut, Trash2, Settings as SettingsIcon, CreditCard, User } from "lucide-react";
+import { LogOut, Trash2, Settings as SettingsIcon, CreditCard, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import type { BusinessProfile } from "@/lib/ember-types";
 
 export default function Settings() {
-  const [profile, setProfile] = useState(mockBusinessProfile);
-  const plan = mockProfile.plan;
+  const { user, signOut } = useAuth();
+  const { profile, loading, updateProfile } = useProfile();
+
+  const bp = (profile?.business_profile || {}) as BusinessProfile;
+  const [form, setForm] = useState<BusinessProfile>(bp);
+
+  useEffect(() => {
+    if (profile?.business_profile) {
+      setForm(profile.business_profile as BusinessProfile);
+    }
+  }, [profile?.business_profile]);
+
+  const plan = profile?.plan || 'trial';
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
-  const limits = PLAN_LIMITS[plan];
+  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.trial;
+
+  const handleSave = async () => {
+    await updateProfile({ business_profile: form as any });
+    toast.success("Profilo salvato!");
+  };
+
+  if (loading) {
+    return <AppLayout><div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div></AppLayout>;
+  }
 
   return (
     <AppLayout>
@@ -41,21 +63,21 @@ export default function Settings() {
               <h2 className="font-semibold text-lg">Profilo Business</h2>
             </div>
             {[
-              { label: 'Nome', value: profile.nome, key: 'nome', type: 'input' },
-              { label: 'Headline', value: profile.headline, key: 'headline', type: 'input' },
+              { label: 'Nome', value: form.nome, key: 'nome', type: 'input' },
+              { label: 'Headline', value: form.headline, key: 'headline', type: 'input' },
             ].map(f => (
               <div key={f.key} className="group">
                 <label className="text-sm font-medium mb-1.5 block text-muted-foreground group-focus-within:text-primary transition-colors">{f.label}</label>
-                <Input value={f.value} onChange={e => setProfile({ ...profile, [f.key]: e.target.value })} className="bg-surface border-border/50 focus:border-primary transition-colors" />
+                <Input value={f.value} onChange={e => setForm({ ...form, [f.key]: e.target.value })} className="bg-surface border-border/50 focus:border-primary transition-colors" />
               </div>
             ))}
             <div className="group">
               <label className="text-sm font-medium mb-1.5 block text-muted-foreground group-focus-within:text-primary transition-colors">Value Proposition</label>
-              <Textarea value={profile.value_proposition} onChange={e => setProfile({ ...profile, value_proposition: e.target.value })} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={3} />
+              <Textarea value={form.value_proposition} onChange={e => setForm({ ...form, value_proposition: e.target.value })} className="bg-surface border-border/50 focus:border-primary transition-colors" rows={3} />
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block text-muted-foreground">Tone of Voice</label>
-              <Select value={profile.tone_of_voice} onValueChange={v => setProfile({ ...profile, tone_of_voice: v })}>
+              <Select value={form.tone_of_voice} onValueChange={v => setForm({ ...form, tone_of_voice: v })}>
                 <SelectTrigger className="bg-surface border-border/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Diretto e pratico">Diretto e pratico</SelectItem>
@@ -67,10 +89,10 @@ export default function Settings() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block text-muted-foreground">Tag</label>
-              <div className="flex flex-wrap gap-2">{profile.tags.map(t => <Badge key={t} variant="outline" className="border-border/50 hover:border-primary/50 transition-colors cursor-default">{t}</Badge>)}</div>
+              <div className="flex flex-wrap gap-2">{(form.tags || []).map(t => <Badge key={t} variant="outline" className="border-border/50 hover:border-primary/50 transition-colors cursor-default">{t}</Badge>)}</div>
             </div>
             <div className="flex gap-3 pt-1">
-              <Button onClick={() => toast.success("Profilo salvato!")} className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg shadow-primary/20">Salva modifiche</Button>
+              <Button onClick={handleSave} className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg shadow-primary/20">Salva modifiche</Button>
               <Button variant="outline" className="border-border/50 hover:bg-surface">Rigenera da LinkedIn</Button>
             </div>
           </CardContent>
@@ -89,11 +111,11 @@ export default function Settings() {
               <span className="text-sm text-muted-foreground">Piano attuale:</span>
               <Badge className="bg-primary/15 text-primary border-0 font-semibold">{planLabel}</Badge>
             </div>
-            <QuotaBar label="Skill-run" used={mockProfile.skill_runs_used} total={mockProfile.skill_runs_limit} />
-            <QuotaBar label="Scraping oggi" used={mockProfile.scrapes_used_today} total={mockProfile.scrapes_daily_limit} />
+            <QuotaBar label="Skill-run" used={profile?.skill_runs_used || 0} total={profile?.skill_runs_limit || 20} />
+            <QuotaBar label="Scraping oggi" used={profile?.scrapes_used_today || 0} total={profile?.scrapes_daily_limit || 0} />
             <div className="flex items-center gap-2 text-sm p-3 bg-surface/50 rounded-xl border border-border/30">
               <span className="text-muted-foreground">Watchlist:</span>
-              <span className="font-medium">{3}<span className="text-muted-foreground font-normal">/{limits.watchlist}</span> profili</span>
+              <span className="font-medium">—<span className="text-muted-foreground font-normal">/{limits.watchlist}</span> profili</span>
             </div>
             <Separator className="bg-border/30" />
             <div className="flex gap-3">
@@ -114,11 +136,11 @@ export default function Settings() {
             </div>
             <div className="p-3 bg-surface/50 rounded-xl border border-border/30">
               <label className="text-xs text-muted-foreground">Email</label>
-              <p className="text-sm font-medium mt-0.5">marco@example.com</p>
+              <p className="text-sm font-medium mt-0.5">{user?.email || '—'}</p>
             </div>
             <Separator className="bg-border/30" />
             <div className="flex gap-3">
-              <Button variant="outline" className="border-border/50 hover:bg-surface">
+              <Button variant="outline" className="border-border/50 hover:bg-surface" onClick={() => signOut()}>
                 <LogOut className="h-4 w-4 mr-2" /> Logout
               </Button>
               <AlertDialog>
