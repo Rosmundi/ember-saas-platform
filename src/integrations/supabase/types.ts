@@ -14,8 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      post_snapshots: {
+        Row: {
+          analysis: Json | null
+          id: string
+          posts_data: Json
+          scraped_at: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json | null
+          id?: string
+          posts_data: Json
+          scraped_at?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis?: Json | null
+          id?: string
+          posts_data?: Json
+          scraped_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_snapshots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          business_profile: Json | null
           company_name: string | null
           created_at: string
           display_name: string | null
@@ -24,12 +57,22 @@ export type Database = {
           linkedin_url: string | null
           onboarding_completed: boolean
           plan: string
+          raw_profile_data: Json | null
           role: string | null
+          scrapes_daily_limit: number
+          scrapes_reset_at: string | null
+          scrapes_used_today: number
+          skill_runs_limit: number
+          skill_runs_used: number
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           target_audience: string | null
+          trial_ends_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          business_profile?: Json | null
           company_name?: string | null
           created_at?: string
           display_name?: string | null
@@ -38,12 +81,22 @@ export type Database = {
           linkedin_url?: string | null
           onboarding_completed?: boolean
           plan?: string
+          raw_profile_data?: Json | null
           role?: string | null
+          scrapes_daily_limit?: number
+          scrapes_reset_at?: string | null
+          scrapes_used_today?: number
+          skill_runs_limit?: number
+          skill_runs_used?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           target_audience?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          business_profile?: Json | null
           company_name?: string | null
           created_at?: string
           display_name?: string | null
@@ -52,19 +105,125 @@ export type Database = {
           linkedin_url?: string | null
           onboarding_completed?: boolean
           plan?: string
+          raw_profile_data?: Json | null
           role?: string | null
+          scrapes_daily_limit?: number
+          scrapes_reset_at?: string | null
+          scrapes_used_today?: number
+          skill_runs_limit?: number
+          skill_runs_used?: number
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           target_audience?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      skill_runs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          input: Json
+          is_scrape: boolean | null
+          output: Json | null
+          skill: string
+          status: string
+          tokens_input: number | null
+          tokens_output: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json
+          is_scrape?: boolean | null
+          output?: Json | null
+          skill: string
+          status?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json
+          is_scrape?: boolean | null
+          output?: Json | null
+          skill?: string
+          status?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_runs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      watchlist: {
+        Row: {
+          azienda: string | null
+          created_at: string | null
+          headline: string | null
+          id: string
+          last_scraped_at: string | null
+          last_snapshot: Json | null
+          linkedin_url: string
+          nome: string | null
+          user_id: string
+        }
+        Insert: {
+          azienda?: string | null
+          created_at?: string | null
+          headline?: string | null
+          id?: string
+          last_scraped_at?: string | null
+          last_snapshot?: Json | null
+          linkedin_url: string
+          nome?: string | null
+          user_id: string
+        }
+        Update: {
+          azienda?: string | null
+          created_at?: string | null
+          headline?: string | null
+          id?: string
+          last_scraped_at?: string | null
+          last_snapshot?: Json | null
+          linkedin_url?: string
+          nome?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      reset_daily_scrapes: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
