@@ -802,7 +802,7 @@ export default function SkillPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const { user } = useAuth();
   const skill = SKILLS.find(s => s.id === skillId);
-  const { profile, consumeSkillRun } = useProfile();
+  const { profile, consumeSkillRun, saveOnboardingProfile } = useProfile();
   const { logRun } = useSkillRuns();
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -828,6 +828,28 @@ export default function SkillPage() {
 
     if (result.ok) {
       setOutput(result.data as Record<string, unknown>);
+
+      // Se è la skill auto-profile-setup, aggiorna anche il profilo utente
+      if (skill.id === 'auto-profile-setup') {
+        const d = result.data as any;
+        const pb = d.profilo_business || {};
+        const hooks = (d.hook_editoriali || []) as string[];
+        await saveOnboardingProfile(
+          formValues.url || profile.linkedin_url || "",
+          {
+            nome: pb.nome || pb.chi_e || (profile.business_profile as any)?.nome || "",
+            headline: pb.chi_e || (profile.business_profile as any)?.headline || "",
+            settore: pb.settore || (profile.business_profile as any)?.settore || "",
+            value_proposition: [pb.offerta, pb.unique_value].filter(Boolean).join(". "),
+            tone_of_voice: (profile.business_profile as any)?.tone_of_voice || "Diretto e pratico",
+            punti_forza: hooks.length > 0 ? hooks : ((profile.business_profile as any)?.punti_forza || []),
+            aree_miglioramento: [],
+            tags: (pb.settore || "").split(/[,\/\s]+/).filter((t: string) => t.length > 2),
+          },
+          d
+        );
+      }
+
       await logRun({
         skill: skill.id,
         input: payload,
