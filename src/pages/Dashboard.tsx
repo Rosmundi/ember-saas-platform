@@ -74,13 +74,13 @@ export default function Dashboard() {
         {/* Profilo fisso */}
         {profile.business_profile && (
           <Card className="bg-card/80 border-border/50 animate-in">
-            <CardContent className="p-5">
+            <CardContent className="p-5 space-y-4">
               <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-4 flex-1">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                     <UserCheck className="h-6 w-6 text-primary" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h2 className="font-semibold">{(profile.business_profile as any).nome || "Il tuo profilo"}</h2>
                     <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{(profile.business_profile as any).chi_e || (profile.business_profile as any).headline || ""}</p>
                     {(profile.business_profile as any).settore && (
@@ -94,19 +94,68 @@ export default function Dashboard() {
                   </Button>
                 </Link>
               </div>
+
               {profile.raw_profile_data?.score_totale != null && (
-                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border/30">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
-                    (profile.raw_profile_data.score_totale as number) >= 70 ? 'bg-emerald-500/15 text-emerald-400' :
-                    (profile.raw_profile_data.score_totale as number) >= 50 ? 'bg-amber-500/15 text-amber-400' :
-                    'bg-destructive/15 text-destructive'
-                  }`}>
-                    {profile.raw_profile_data.score_totale as number}
+                <>
+                  <div className="flex items-center gap-3 pt-3 border-t border-border/30">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl ${
+                      (profile.raw_profile_data.score_totale as number) >= 70 ? 'bg-emerald-500/15 text-emerald-400' :
+                      (profile.raw_profile_data.score_totale as number) >= 50 ? 'bg-amber-500/15 text-amber-400' :
+                      'bg-destructive/15 text-destructive'
+                    }`}>
+                      {profile.raw_profile_data.score_totale as number}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">LinkedIn Score — {(profile.raw_profile_data.livello as string) || ""}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{(profile.raw_profile_data.sintesi as string) || ""}</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium">LinkedIn Score</p>
-                    <p className="text-xs text-muted-foreground">{(profile.raw_profile_data.livello as string) || ""} — {profile.raw_profile_data.sintesi ? (profile.raw_profile_data.sintesi as string).slice(0, 100) + "..." : "Analizza il profilo per vedere il dettaglio"}</p>
-                  </div>
+
+                  {Array.isArray(profile.raw_profile_data.azioni_prioritarie) && (profile.raw_profile_data.azioni_prioritarie as string[]).length > 0 && (
+                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+                      <p className="text-xs font-semibold mb-2">🎯 Da fare subito</p>
+                      <div className="space-y-1.5">
+                        {(profile.raw_profile_data.azioni_prioritarie as string[]).slice(0, 3).map((a, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{i + 1}</span>
+                            <p className="text-xs">{a}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {Array.isArray(profile.raw_profile_data.sezioni) && (profile.raw_profile_data.sezioni as any[]).filter(s => s.score < 70).length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold mb-2 text-muted-foreground">Aree da migliorare</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {(profile.raw_profile_data.sezioni as any[])
+                          .filter(s => s.score < 70)
+                          .sort((a, b) => a.score - b.score)
+                          .slice(0, 3)
+                          .map((s: any) => (
+                            <Link key={s.nome} to="/skill/auto-profile-setup" className="block">
+                              <div className={`rounded-lg border p-2 hover:border-primary/50 transition-colors ${
+                                s.score >= 50 ? 'bg-amber-500/5 border-amber-500/20' : 'bg-destructive/5 border-destructive/20'
+                              }`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-medium">{s.nome}</span>
+                                  <span className={`text-xs font-bold ${s.score >= 50 ? 'text-amber-400' : 'text-destructive'}`}>{s.score}</span>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {profile.raw_profile_data?.score_totale == null && (
+                <div className="pt-3 border-t border-border/30">
+                  <p className="text-xs text-muted-foreground">
+                    Lancia <Link to="/skill/auto-profile-setup" className="text-primary hover:underline">Analizza profilo</Link> per vedere score e raccomandazioni.
+                  </p>
                 </div>
               )}
             </CardContent>
