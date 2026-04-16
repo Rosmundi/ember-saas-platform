@@ -86,7 +86,7 @@ export function useProfile() {
   const updateProfile = useCallback(
     async (updates: Partial<ProfileRow>) => {
       if (!user) return;
-      const { error: err } = await supabase.from("profiles").update(updates).eq("user_id", user.id);
+      const { error: err } = await supabase.from("profiles").update(updates as any).eq("user_id", user.id);
       if (err) {
         setError(err.message);
         return;
@@ -104,10 +104,10 @@ export function useProfile() {
         .from("profiles")
         .update({
           linkedin_url: linkedinUrl,
-          business_profile: businessProfile as unknown as Record<string, unknown>,
-          raw_profile_data: rawData,
+          business_profile: businessProfile as any,
+          raw_profile_data: rawData as any,
           onboarding_completed: true,
-        })
+        } as any)
         .eq("user_id", user.id);
       if (err) {
         setError(err.message);
@@ -124,7 +124,7 @@ export function useProfile() {
       if (!user) return;
       const { error: err } = await supabase
         .from("profiles")
-        .update({ raw_profile_data: newRawData })
+        .update({ raw_profile_data: newRawData as any } as any)
         .eq("user_id", user.id);
       if (err) {
         setError(err.message);
