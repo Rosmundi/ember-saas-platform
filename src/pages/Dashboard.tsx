@@ -150,8 +150,8 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-base">{profile.business_profile?.nome || "Il tuo profilo"}</h2>
-                  {profile.business_profile?.chi_e && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{profile.business_profile.chi_e}</p>
+                  {(profile.business_profile as any)?.chi_e && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{(profile.business_profile as any).chi_e}</p>
                   )}
                   {profile.business_profile?.settore && (
                     <Badge className="mt-2 bg-blue-500/10 text-blue-400 border-0 text-[10px]">
