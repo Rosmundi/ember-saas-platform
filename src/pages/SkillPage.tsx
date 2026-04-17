@@ -1331,15 +1331,16 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
+      const err = (result as Extract<typeof result, { ok: false }>).error;
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: err.message,
       });
-      toast.error(emberErrorMessage(result.error));
+      toast.error(emberErrorMessage(err));
     }
 
     setRegeneratingSection(null);
