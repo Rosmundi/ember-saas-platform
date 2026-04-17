@@ -1148,7 +1148,7 @@ export default function SkillPage() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const skill = SKILLS.find((s) => s.id === skillId);
-  const { profile, consumeSkillRun, saveOnboardingProfile, updateRawProfileData } = useProfile();
+  const { profile, consumeSkillRun, updateRawProfileData, updateProfile } = useProfile();
   const { logRun } = useSkillRuns();
 
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
@@ -1212,7 +1212,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as unknown as Record<string, unknown> | null,
+      profile.business_profile as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1230,17 +1230,23 @@ export default function SkillPage() {
       await consumeSkillRun(skill.usesScraping);
 
       // Persist auto-profile-setup analysis on profile
+      // v3.4.1 fix (B2): NON sovrascrivere business_profile (ha campi custom da Onboarding:
+      // tone_of_voice, value_proposition, punti_forza, tags) con il sotto-set di 5 campi
+      // restituito dal prompt. Salviamo solo raw_profile_data e, se cambiato, linkedin_url.
       if (skill.id === "auto-profile-setup") {
         const data = result.data as any;
         if (data?.score_totale) {
-          const linkedinUrl = formValues.url || profile.linkedin_url || "";
-          await saveOnboardingProfile(linkedinUrl, (data.profilo_business || profile.business_profile) as any, data);
+          await updateRawProfileData(data);
+          const newUrl = formValues.url?.trim();
+          if (newUrl && newUrl !== profile.linkedin_url) {
+            await updateProfile({ linkedin_url: newUrl });
+          }
         }
       }
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const msg = emberErrorMessage((result as any).error);
+      const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1249,7 +1255,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: (result as any).error.message,
+        error_message: result.error.message,
       });
     }
 
@@ -1288,7 +1294,7 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
-      toast.error(emberErrorMessage((result as any).error));
+      toast.error(emberErrorMessage(result.error));
     }
 
     setRegeneratingSection(null);
