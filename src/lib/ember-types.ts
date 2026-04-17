@@ -30,6 +30,7 @@ export interface BusinessProfile {
   nome: string;
   headline: string;
   settore: string;
+  chi_e?: string;
   value_proposition: string;
   tone_of_voice: string;
   punti_forza: string[];
