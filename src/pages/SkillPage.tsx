@@ -1295,7 +1295,7 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
-      toast.error(emberErrorMessage(result.error));
+      toast.error(emberErrorMessage((result as Extract<typeof result, { ok: false }>).error));
     }
 
     setRegeneratingSection(null);
