@@ -6,6 +6,12 @@ import type { SkillId } from "@/lib/ember-types";
 
 const N8N_BASE = import.meta.env.VITE_N8N_BASE_URL || "https://n8n.archetipo.info/webhook";
 
+// v3.4.1 fix (H4): shared secret opzionale. Se VITE_EMBER_KEY è settato,
+// viene mandato come header X-Ember-Key su TUTTE le chiamate webhook.
+// Lato n8n, un If-node deve rifiutare con 401 se l'header non matcha.
+// Se la env var non è settata, l'header viene omesso → nessuna regressione.
+const EMBER_KEY = import.meta.env.VITE_EMBER_KEY || "";
+
 export interface EmberResponse<T = Record<string, unknown>> {
   success: boolean;
   skill: string;
@@ -46,7 +52,13 @@ export async function callRegenerateSection(payload: {
   profile_context: Record<string, unknown>;
   user_feedback?: string;
 }): Promise<EmberResult<{ section: string; new_rewrite: string; variazione_applicata?: string }>> {
-  return callWebhook("ember/regenerate-section", payload, 30_000);
+  // v3.4.1 fix (H2): JSON.stringify omette chiavi undefined. Forziamo stringa vuota
+  // per evitare che n8n riceva il campo assente e il prompt LLM mostri "undefined" letterale.
+  const safePayload = {
+    ...payload,
+    user_feedback: payload.user_feedback ?? "",
+  };
+  return callWebhook("ember/regenerate-section", safePayload, 30_000);
 }
 
 /** Helper interno: chiama un qualsiasi webhook n8n con timeout configurabile. */
@@ -62,9 +74,14 @@ async function callWebhook<T = Record<string, unknown>>(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (EMBER_KEY) {
+      headers["X-Ember-Key"] = EMBER_KEY;
+    }
+
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -74,6 +91,17 @@ async function callWebhook<T = Record<string, unknown>>(
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
+      // v3.4.1 (H4): distingui 401 (guard X-Ember-Key) dagli altri errori n8n
+      if (response.status === 401) {
+        return {
+          ok: false,
+          error: {
+            code: "n8n_error",
+            message: "Chiave condivisa non valida o assente.",
+            detail: "Verifica VITE_EMBER_KEY in Lovable e EMBER_SHARED_KEY in n8n.",
+          },
+        };
+      }
       return {
         ok: false,
         error: {
