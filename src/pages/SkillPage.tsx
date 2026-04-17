@@ -1212,7 +1212,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as Record<string, unknown> | null,
+      profile.business_profile as unknown as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
