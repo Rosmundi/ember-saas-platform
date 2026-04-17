@@ -1260,7 +1260,8 @@ export default function SkillPage() {
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const msg = emberErrorMessage(result.error);
+      const err = (result as Extract<typeof result, { ok: false }>).error;
+      const msg = emberErrorMessage(err);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1269,7 +1270,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: err.message,
       });
     }
 
