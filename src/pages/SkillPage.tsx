@@ -935,8 +935,14 @@ function SkillForm({
   loading: boolean;
 }) {
   const [searchParams] = useSearchParams();
+  const { profile } = useProfile();
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
+    // v3.4.1 fix (H3): precompila URL LinkedIn dal profilo o dalla query string
+    // così "Rianalizza" dalla Dashboard non costringe a reincollare l'URL.
+    if (skillId === "auto-profile-setup") {
+      init.url = searchParams.get("url") || profile?.linkedin_url || "";
+    }
     if (skillId === "visual-post-builder") init.post = searchParams.get("post") || "";
     if (skillId === "prospect-finder") {
       const icp = searchParams.get("icp");
@@ -949,6 +955,14 @@ function SkillForm({
     }
     return init;
   });
+
+  // Se il profilo si carica dopo il mount, aggiorna il campo URL una volta sola
+  useEffect(() => {
+    if (skillId === "auto-profile-setup" && !values.url && profile?.linkedin_url) {
+      setValues((prev) => ({ ...prev, url: profile.linkedin_url || "" }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.linkedin_url]);
 
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
 
@@ -1212,7 +1226,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as unknown as Record<string, unknown> | null,
+      profile.business_profile as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1246,8 +1260,7 @@ export default function SkillPage() {
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
-      const msg = emberErrorMessage(err);
+      const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1256,7 +1269,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
     }
 
@@ -1270,7 +1283,15 @@ export default function SkillPage() {
     const section = data.sezioni?.find((s: any) => s.nome === sectionName);
     if (!section) return;
 
+    // v3.4.1 fix (H1): gating quota skill_runs. regenerate-section costa come una skill normale (Claude call)
+    // quindi consuma 1 skill_run ma NON 1 scrape. Blocca se l'utente ha esaurito la quota.
+    if (profile.skill_runs_used >= profile.skill_runs_limit) {
+      toast.error("Hai raggiunto il limite di skill-run. Rianalizza domani o passa a un piano superiore.");
+      return;
+    }
+
     setRegeneratingSection(sectionName);
+    const regenStart = Date.now();
 
     const result = await callRegenerateSection({
       user_id: user.id,
@@ -1280,6 +1301,8 @@ export default function SkillPage() {
       profile_context: (data.profilo_business || profile.business_profile || {}) as Record<string, unknown>,
       user_feedback: feedback || undefined,
     });
+
+    const regenDuration = Date.now() - regenStart;
 
     if (result.ok) {
       const newRewrite = result.data.new_rewrite;
@@ -1293,9 +1316,29 @@ export default function SkillPage() {
       // Persist to profile
       await updateRawProfileData(updated);
 
+      // v3.4.1 fix (H1): traccia la rigenerazione come skill_run (no scrape).
+      // Richiede migration 002_allow_regenerate_skill.sql per allargare il CHECK constraint.
+      await logRun({
+        skill: "regenerate-section",
+        input: { section: sectionName, feedback: feedback || null },
+        output: { new_rewrite: newRewrite, variazione_applicata: result.data.variazione_applicata },
+        status: "completed",
+        is_scrape: false,
+        duration_ms: regenDuration,
+      });
+      await consumeSkillRun(false);
+
       toast.success(`${sectionName} rigenerata`);
     } else {
-      toast.error(emberErrorMessage((result as Extract<typeof result, { ok: false }>).error));
+      await logRun({
+        skill: "regenerate-section",
+        input: { section: sectionName, feedback: feedback || null },
+        output: null,
+        status: "error",
+        is_scrape: false,
+        error_message: result.error.message,
+      });
+      toast.error(emberErrorMessage(result.error));
     }
 
     setRegeneratingSection(null);
