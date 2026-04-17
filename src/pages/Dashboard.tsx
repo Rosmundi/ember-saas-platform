@@ -150,8 +150,8 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-base">{profile.business_profile?.nome || "Il tuo profilo"}</h2>
-                  {(profile.business_profile as any)?.chi_e && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{(profile.business_profile as any).chi_e}</p>
+                  {profile.business_profile?.chi_e && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{profile.business_profile.chi_e}</p>
                   )}
                   {profile.business_profile?.settore && (
                     <Badge className="mt-2 bg-blue-500/10 text-blue-400 border-0 text-[10px]">
@@ -239,7 +239,10 @@ export default function Dashboard() {
                 )}
 
                 {/* =========== PRIMA / DOPO — Headline =========== */}
-                {headlineSection && (headlineSection.stato_attuale || headlineSection.riscrittura) && (
+                {/* v3.4.1 fix (B3): mostra la card SOLO se c'è almeno la riscrittura.
+                    Se anche stato_attuale è presente → layout 2 col (Prima | Dopo).
+                    Se stato_attuale manca (profili cached pre-v3.4) → solo Dopo + CTA Rianalizza. */}
+                {headlineSection?.riscrittura && (
                   <div className="pt-4 border-t border-border/30">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -252,27 +255,46 @@ export default function Dashboard() {
                         Modifica in dettaglio <ChevronRight className="h-3 w-3" />
                       </Link>
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <Link
-                        to="/skill/auto-profile-setup?section=Headline"
-                        className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
-                      >
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
-                        <p className="text-sm leading-relaxed line-clamp-3">{headlineSection.stato_attuale || "—"}</p>
-                      </Link>
-                      <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] uppercase tracking-wider text-primary">Dopo</p>
-                          {headlineSection.riscrittura && <CopyInline text={headlineSection.riscrittura} />}
+                    {headlineSection.stato_attuale ? (
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <Link
+                          to="/skill/auto-profile-setup?section=Headline"
+                          className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
+                        >
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
+                          <p className="text-sm leading-relaxed line-clamp-3">{headlineSection.stato_attuale}</p>
+                        </Link>
+                        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] uppercase tracking-wider text-primary">Dopo</p>
+                            <CopyInline text={headlineSection.riscrittura} />
+                          </div>
+                          <p className="text-sm leading-relaxed line-clamp-3">{headlineSection.riscrittura}</p>
                         </div>
-                        <p className="text-sm leading-relaxed line-clamp-3">{headlineSection.riscrittura || "—"}</p>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] uppercase tracking-wider text-primary">Headline suggerita</p>
+                            <CopyInline text={headlineSection.riscrittura} />
+                          </div>
+                          <p className="text-sm leading-relaxed line-clamp-3">{headlineSection.riscrittura}</p>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Il testo attuale non è stato rilevato.{" "}
+                          <Link to="/skill/auto-profile-setup?force=1" className="text-primary hover:underline">
+                            Rianalizza
+                          </Link>{" "}
+                          per abilitare il confronto prima/dopo.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* =========== PRIMA / DOPO — About =========== */}
-                {aboutSection && (aboutSection.stato_attuale || aboutSection.riscrittura) && (
+                {aboutSection?.riscrittura && (
                   <div className="pt-4 border-t border-border/30">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -285,26 +307,47 @@ export default function Dashboard() {
                         Modifica in dettaglio <ChevronRight className="h-3 w-3" />
                       </Link>
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <Link
-                        to="/skill/auto-profile-setup?section=About"
-                        className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
-                      >
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
-                        <p className="text-xs leading-relaxed whitespace-pre-wrap line-clamp-6">
-                          {aboutSection.stato_attuale || "—"}
-                        </p>
-                      </Link>
-                      <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] uppercase tracking-wider text-primary">Dopo</p>
-                          {aboutSection.riscrittura && <CopyInline text={aboutSection.riscrittura} />}
+                    {aboutSection.stato_attuale ? (
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <Link
+                          to="/skill/auto-profile-setup?section=About"
+                          className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
+                        >
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap line-clamp-6">
+                            {aboutSection.stato_attuale}
+                          </p>
+                        </Link>
+                        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] uppercase tracking-wider text-primary">Dopo</p>
+                            <CopyInline text={aboutSection.riscrittura} />
+                          </div>
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap line-clamp-6">
+                            {aboutSection.riscrittura}
+                          </p>
                         </div>
-                        <p className="text-xs leading-relaxed whitespace-pre-wrap line-clamp-6">
-                          {aboutSection.riscrittura || "—"}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] uppercase tracking-wider text-primary">About suggerito</p>
+                            <CopyInline text={aboutSection.riscrittura} />
+                          </div>
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap line-clamp-6">
+                            {aboutSection.riscrittura}
+                          </p>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Il testo attuale non è stato rilevato.{" "}
+                          <Link to="/skill/auto-profile-setup?force=1" className="text-primary hover:underline">
+                            Rianalizza
+                          </Link>{" "}
+                          per abilitare il confronto prima/dopo.
                         </p>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
