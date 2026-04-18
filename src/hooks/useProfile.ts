@@ -70,7 +70,7 @@ export function useProfile() {
     setError(null);
 
     // Tenta il riaccredito. Se fallisce non blocchiamo il fetch (failsafe).
-    const { error: rpcErr } = await supabase.rpc("reset_scrape_quota_if_due", {
+    const { error: rpcErr } = await (supabase.rpc as any)("reset_scrape_quota_if_due", {
       p_user_id: user.id,
     });
     if (rpcErr) {
@@ -164,7 +164,7 @@ export function useProfile() {
       if (!user || !profile) return;
 
       // 1. Riaccredita se dovuto.
-      await supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id });
+      await (supabase.rpc as any)("reset_scrape_quota_if_due", { p_user_id: user.id });
 
       // 2. Rileggi i contatori freschi dal DB.
       const { data: fresh } = await supabase
