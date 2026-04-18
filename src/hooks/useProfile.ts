@@ -55,7 +55,11 @@ export function useProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Carica profilo
+  // Carica profilo.
+  // v3.4.2 fix: prima del SELECT chiama l'RPC atomica reset_scrape_quota_if_due,
+  // che resetta scrapes_used_today SE scrapes_reset_at è scaduto. L'atomicità è
+  // garantita dal WHERE scrapes_reset_at < now() lato SQL: no race condition
+  // anche con più tab aperte.
   const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
@@ -64,6 +68,16 @@ export function useProfile() {
     }
     setLoading(true);
     setError(null);
+
+    // Tenta il riaccredito. Se fallisce non blocchiamo il fetch (failsafe).
+    const { error: rpcErr } = await supabase.rpc("reset_scrape_quota_if_due", {
+      p_user_id: user.id,
+    });
+    if (rpcErr) {
+      // Non blocchiamo il login, ma logghiamo per debug.
+      // eslint-disable-next-line no-console
+      console.warn("[useProfile] reset_scrape_quota_if_due failed:", rpcErr.message);
+    }
 
     const { data, error: err } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
 
@@ -86,7 +100,10 @@ export function useProfile() {
   const updateProfile = useCallback(
     async (updates: Partial<ProfileRow>) => {
       if (!user) return;
-      const { error: err } = await supabase.from("profiles").update(updates as any).eq("user_id", user.id);
+      const { error: err } = await supabase
+        .from("profiles")
+        .update(updates as any)
+        .eq("user_id", user.id);
       if (err) {
         setError(err.message);
         return;
@@ -135,15 +152,35 @@ export function useProfile() {
     [user, fetchProfile],
   );
 
-  // Incrementa contatori dopo skill run
+  // Incrementa contatori dopo skill run.
+  // v3.4.2 fix: chiama reset_scrape_quota_if_due PRIMA di rileggere il profilo
+  // fresh dal DB, così se l'utente ha la pagina aperta da più di 24h, il
+  // contatore viene azzerato prima di essere incrementato.
+  // Rileggere i contatori dal DB (invece di usare lo state React) evita race
+  // condition con altre tab e rende l'incremento corretto anche se il reset
+  // è appena avvenuto.
   const consumeSkillRun = useCallback(
     async (isScrape: boolean) => {
       if (!user || !profile) return;
+
+      // 1. Riaccredita se dovuto.
+      await supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id });
+
+      // 2. Rileggi i contatori freschi dal DB.
+      const { data: fresh } = await supabase
+        .from("profiles")
+        .select("skill_runs_used, scrapes_used_today")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const currentSkillRuns = (fresh as any)?.skill_runs_used ?? profile.skill_runs_used;
+      const currentScrapes = (fresh as any)?.scrapes_used_today ?? profile.scrapes_used_today;
+
       const updates: Record<string, unknown> = {
-        skill_runs_used: profile.skill_runs_used + 1,
+        skill_runs_used: currentSkillRuns + 1,
       };
       if (isScrape) {
-        updates.scrapes_used_today = profile.scrapes_used_today + 1;
+        updates.scrapes_used_today = currentScrapes + 1;
       }
       await updateProfile(updates as Partial<ProfileRow>);
     },
