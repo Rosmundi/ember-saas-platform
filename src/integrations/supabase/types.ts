@@ -224,6 +224,10 @@ export type Database = {
     }
     Functions: {
       reset_daily_scrapes: { Args: never; Returns: undefined }
+      reset_scrape_quota_if_due: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
