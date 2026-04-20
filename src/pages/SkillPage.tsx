@@ -936,10 +936,26 @@ function SkillForm({
 }) {
   const [searchParams] = useSearchParams();
   const { profile } = useProfile();
+
+  // v3.4.2 fix (P1): helper per costruire il testo pre-compilato del campo
+  // "description" di icp-builder a partire da raw_profile_data.target_buyer.
+  // Ritorna '' se il profilo non ha ancora l'analisi completa.
+  const buildIcpPrefill = (p: typeof profile): string => {
+    const tb = (p?.raw_profile_data as any)?.target_buyer;
+    if (!tb) return "";
+    const desc = typeof tb.descrizione === "string" ? tb.descrizione.trim() : "";
+    const pains = Array.isArray(tb.pain_points)
+      ? ((tb.pain_points as unknown[]).filter((x) => typeof x === "string" && (x as string).trim()) as string[])
+      : [];
+    const parts: string[] = [];
+    if (desc) parts.push(desc);
+    if (pains.length) parts.push("\n\nPain points:\n" + pains.map((pp) => `- ${pp}`).join("\n"));
+    return parts.join("");
+  };
+
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     // v3.4.1 fix (H3): precompila URL LinkedIn dal profilo o dalla query string
-    // così "Rianalizza" dalla Dashboard non costringe a reincollare l'URL.
     if (skillId === "auto-profile-setup") {
       init.url = searchParams.get("url") || profile?.linkedin_url || "";
     }
@@ -953,16 +969,30 @@ function SkillForm({
       init.headline = searchParams.get("headline") || "";
       init.azienda = searchParams.get("azienda") || "";
     }
+    // v3.4.2 fix (P1): precompila ICP builder con target dal profilo analizzato.
+    if (skillId === "icp-builder") {
+      const fromUrl = searchParams.get("description") || "";
+      init.description = fromUrl || buildIcpPrefill(profile);
+    }
     return init;
   });
 
-  // Se il profilo si carica dopo il mount, aggiorna il campo URL una volta sola
+  // Se il profilo si carica dopo il mount, sync URL
   useEffect(() => {
     if (skillId === "auto-profile-setup" && !values.url && profile?.linkedin_url) {
       setValues((prev) => ({ ...prev, url: profile.linkedin_url || "" }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.linkedin_url]);
+
+  // v3.4.2 fix (P1): sync ICP prefill se raw_profile_data arriva tardi.
+  useEffect(() => {
+    if (skillId === "icp-builder" && !values.description) {
+      const pre = buildIcpPrefill(profile);
+      if (pre) setValues((prev) => ({ ...prev, description: pre }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.raw_profile_data]);
 
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
 
