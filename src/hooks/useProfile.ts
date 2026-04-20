@@ -69,14 +69,19 @@ export function useProfile() {
     setLoading(true);
     setError(null);
 
-    // Tenta il riaccredito. Se fallisce non blocchiamo il fetch (failsafe).
-    const { error: rpcErr } = await (supabase.rpc as any)("reset_scrape_quota_if_due", {
-      p_user_id: user.id,
-    });
-    if (rpcErr) {
-      // Non blocchiamo il login, ma logghiamo per debug.
+    // Tenta il riaccredito di entrambe le quote in parallelo (daily scrape + monthly skill_runs).
+    // Se una fallisce non blocchiamo il fetch (failsafe).
+    const [scrapeReset, skillRunsReset] = await Promise.all([
+      supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
+      supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
+    ]);
+    if (scrapeReset.error) {
       // eslint-disable-next-line no-console
-      console.warn("[useProfile] reset_scrape_quota_if_due failed:", rpcErr.message);
+      console.warn("[useProfile] reset_scrape_quota_if_due failed:", scrapeReset.error.message);
+    }
+    if (skillRunsReset.error) {
+      // eslint-disable-next-line no-console
+      console.warn("[useProfile] reset_skill_runs_if_due failed:", skillRunsReset.error.message);
     }
 
     const { data, error: err } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
@@ -163,8 +168,11 @@ export function useProfile() {
     async (isScrape: boolean) => {
       if (!user || !profile) return;
 
-      // 1. Riaccredita se dovuto.
-      await (supabase.rpc as any)("reset_scrape_quota_if_due", { p_user_id: user.id });
+      // 1. Riaccredita se dovuto (entrambe le quote, in parallelo).
+      await Promise.all([
+        supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
+        supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
+      ]);
 
       // 2. Rileggi i contatori freschi dal DB.
       const { data: fresh } = await supabase
