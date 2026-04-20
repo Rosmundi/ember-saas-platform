@@ -1049,20 +1049,30 @@ function SkillForm({
   loading: boolean;
 }) {
   const [searchParams] = useSearchParams();
-  const { profile } = useProfile();
+  const { profile, updateRawProfileData } = useProfile();
 
-  // v3.4.2 fix (P4): stato dell'ICP salvato in localStorage, per mostrare banner nel prospect-finder.
-  const [storedIcp, setStoredIcp] = useState<{ generated_at: string; user_input?: string } | null>(() => {
-    if (skillId !== "prospect-finder") return null;
+  // v3.4.3 (P5): banner ICP precompilato. Fonte primaria = profile.raw_profile_data.icp_current (DB).
+  // Fallback = localStorage (utile se profile ancora in loading).
+  const [storedIcp, setStoredIcp] = useState<{ generated_at: string; user_input?: string } | null>(null);
+  useEffect(() => {
+    if (skillId !== "prospect-finder") return;
+    const fromDb = (profile?.raw_profile_data as any)?.icp_current;
+    if (fromDb?.generated_at) {
+      setStoredIcp({ generated_at: fromDb.generated_at, user_input: fromDb.user_input || "" });
+      return;
+    }
     try {
       const raw = localStorage.getItem("ember:last_icp");
-      if (!raw) return null;
+      if (!raw) {
+        setStoredIcp(null);
+        return;
+      }
       const obj = JSON.parse(raw);
-      return { generated_at: obj.generated_at || "", user_input: obj.user_input || "" };
+      setStoredIcp({ generated_at: obj.generated_at || "", user_input: obj.user_input || "" });
     } catch {
-      return null;
+      setStoredIcp(null);
     }
-  });
+  }, [skillId, profile?.raw_profile_data]);
   // v3.4.2 fix (P1): helper per costruire il testo pre-compilato del campo
   // "description" di icp-builder a partire da raw_profile_data.target_buyer.
   // Ritorna '' se il profilo non ha ancora l'analisi completa.
@@ -1087,12 +1097,11 @@ function SkillForm({
       init.url = searchParams.get("url") || profile?.linkedin_url || "";
     }
     if (skillId === "visual-post-builder") init.post = searchParams.get("post") || "";
-    // v3.4.2 fix (P4): prospect-finder — priorità: query string > ICP salvato in localStorage.
-    // Serializziamo l'ICP come testo leggibile nella textarea "query", non come JSON raw.
+    // v3.4.3 (P5): prospect-finder — priorità: query string > DB (profile.raw_profile_data.icp_current) > localStorage.
+    // DB è la fonte persistente (refresh-safe, cross-device). localStorage è fallback cache.
     if (skillId === "prospect-finder") {
       const icpFromUrl = searchParams.get("icp");
       if (icpFromUrl) {
-        // tentativo parse: se è JSON lo serializziamo leggibile; se è già testo lo usiamo così
         try {
           const parsed = JSON.parse(icpFromUrl);
           init.query = formatIcpForTextarea(parsed);
@@ -1100,14 +1109,19 @@ function SkillForm({
           init.query = icpFromUrl;
         }
       } else {
-        try {
-          const stored = localStorage.getItem("ember:last_icp");
-          if (stored) {
-            const obj = JSON.parse(stored);
-            if (obj?.icp) init.query = formatIcpForTextarea(obj.icp);
+        const fromDb = (profile?.raw_profile_data as any)?.icp_current;
+        if (fromDb?.icp) {
+          init.query = formatIcpForTextarea(fromDb.icp);
+        } else {
+          try {
+            const stored = localStorage.getItem("ember:last_icp");
+            if (stored) {
+              const obj = JSON.parse(stored);
+              if (obj?.icp) init.query = formatIcpForTextarea(obj.icp);
+            }
+          } catch {
+            /* ignore */
           }
-        } catch {
-          /* ignore */
         }
       }
     }
@@ -1139,6 +1153,18 @@ function SkillForm({
     if (skillId === "icp-builder" && !values.description) {
       const pre = buildIcpPrefill(profile);
       if (pre) setValues((prev) => ({ ...prev, description: pre }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.raw_profile_data]);
+
+  // v3.4.3 (P5): sync prospect-finder query quando l'ICP in DB arriva tardi.
+  // Solo se query è ancora vuota (non sovrascrive input manuale).
+  useEffect(() => {
+    if (skillId !== "prospect-finder") return;
+    if (values.query) return;
+    const fromDb = (profile?.raw_profile_data as any)?.icp_current;
+    if (fromDb?.icp) {
+      setValues((prev) => ({ ...prev, query: formatIcpForTextarea(fromDb.icp) }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.raw_profile_data]);
@@ -1246,13 +1272,24 @@ function SkillForm({
     );
   }
   if (skillId === "prospect-finder") {
-    // v3.4.2 fix (P4): banner informativo se il campo query è stato precompilato da ICP salvato.
+    // v3.4.3 (P5): banner informativo se il campo query è stato precompilato da ICP salvato.
     const hasPrefilledIcp = !!storedIcp && !!values.query;
-    const clearIcp = () => {
+    const clearIcp = async () => {
+      // Rimuove da localStorage
       try {
         localStorage.removeItem("ember:last_icp");
       } catch {
         /* ignore */
+      }
+      // Rimuove anche da DB (merge con tutto raw_profile_data tranne icp_current)
+      if (profile?.raw_profile_data) {
+        const { icp_current, ...rest } = profile.raw_profile_data as any;
+        try {
+          await updateRawProfileData(rest);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[SkillForm] clearIcp DB update failed:", e);
+        }
       }
       setStoredIcp(null);
       set("query", "");
@@ -1405,6 +1442,26 @@ export default function SkillPage() {
     }
   }, [skill?.id, profile?.raw_profile_data, forceNewRun, output]);
 
+  // v3.4.3 (P5): cache loading per icp-builder. Fonte di verità = profiles.raw_profile_data.icp_current.
+  // L'ICP diventa persistente come la dashboard: refresh pagina, altro device, nuova sessione → sempre disponibile.
+  useEffect(() => {
+    if (skill?.id !== "icp-builder") return;
+    if (forceNewRun) return;
+    if (output) return;
+
+    const cached = (profile?.raw_profile_data as any)?.icp_current;
+    if (cached?.icp) {
+      setOutput({
+        icp: cached.icp,
+        buyer_personas: cached.buyer_personas,
+        linkedin_search_query: cached.linkedin_search_query,
+        trigger_events: cached.trigger_events,
+        exclusioni: cached.exclusioni,
+      });
+      setLoadedFromCache(true);
+    }
+  }, [skill?.id, profile?.raw_profile_data, forceNewRun, output]);
+
   // Scroll to target section after output renders
   useEffect(() => {
     if (!output || !targetSection) return;
@@ -1444,7 +1501,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as unknown as Record<string, unknown> | null,
+      profile.business_profile as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1476,44 +1533,43 @@ export default function SkillPage() {
         }
       }
 
-      // v3.4.2 fix (P4 + B): persistenza ICP in localStorage così il form prospect-finder
-      // può precompilarsi anche se l'utente naviga via e torna dopo.
-      // Fix B: se data.icp non esiste (schema backend diverso), usa l'intero `data` come ICP
-      // così il flusso non si rompe e la textarea prospect-finder è comunque popolata.
+      // v3.4.3 (P5): persistenza ICP su DB (fonte di verità) + localStorage (cache veloce).
+      // L'ICP è salvato in profiles.raw_profile_data.icp_current via merge (non sovrascrive l'analisi profilo).
+      // Così refresh pagina / cambio device / nuova sessione → ICP sempre disponibile.
+      // Fix B: se data.icp non esiste (schema backend diverso), usa l'intero `data` come ICP.
       // Phase 2 TODO: migrare su tabella `icps` con history.
       if (skill.id === "icp-builder") {
-        try {
-          const data = (result.data ?? {}) as any;
-          // fallback: se non c'è data.icp, considera tutto data come ICP
-          const icpPayload = data?.icp ?? data;
-          if (icpPayload && typeof icpPayload === "object" && Object.keys(icpPayload).length > 0) {
-            localStorage.setItem(
-              "ember:last_icp",
-              JSON.stringify({
-                generated_at: new Date().toISOString(),
-                icp: icpPayload,
-                buyer_personas: data.buyer_personas ?? null,
-                linkedin_search_query: data.linkedin_search_query ?? null,
-                trigger_events: data.trigger_events ?? null,
-                exclusioni: data.exclusioni ?? null,
-                user_input: formValues.description || "",
-              }),
-            );
-          } else {
+        const data = (result.data ?? {}) as any;
+        const icpPayload = data?.icp ?? data;
+        if (icpPayload && typeof icpPayload === "object" && Object.keys(icpPayload).length > 0) {
+          const icpRecord = {
+            generated_at: new Date().toISOString(),
+            icp: icpPayload,
+            buyer_personas: data.buyer_personas ?? null,
+            linkedin_search_query: data.linkedin_search_query ?? null,
+            trigger_events: data.trigger_events ?? null,
+            exclusioni: data.exclusioni ?? null,
+            user_input: formValues.description || "",
+          };
+          // Salva su DB con merge (preserva l'analisi di auto-profile-setup)
+          const currentRaw = (profile.raw_profile_data || {}) as Record<string, unknown>;
+          await updateRawProfileData({ ...currentRaw, icp_current: icpRecord });
+          // Fallback localStorage (utile se profile non ancora hydrated)
+          try {
+            localStorage.setItem("ember:last_icp", JSON.stringify(icpRecord));
+          } catch (e) {
             // eslint-disable-next-line no-console
-            console.warn("[SkillPage] icp-builder: nessun payload utile da salvare in localStorage");
+            console.warn("[SkillPage] localStorage set failed:", e);
           }
-        } catch (e) {
-          // quota localStorage piena o privacy mode → ignora silente, non bloccare flow
+        } else {
           // eslint-disable-next-line no-console
-          console.warn("[SkillPage] localStorage set failed:", e);
+          console.warn("[SkillPage] icp-builder: nessun payload utile da salvare");
         }
       }
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
-      const msg = emberErrorMessage(err);
+      const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1522,7 +1578,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
     }
 
@@ -1583,16 +1639,15 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
-      toast.error(emberErrorMessage(err));
+      toast.error(emberErrorMessage(result.error));
     }
 
     setRegeneratingSection(null);
@@ -1602,6 +1657,10 @@ export default function SkillPage() {
 
   // Per auto-profile-setup con cache: NON mostrare il form, solo risultato + Rianalizza
   const isAutoProfileWithCache = skill.id === "auto-profile-setup" && loadedFromCache && !forceNewRun;
+  // v3.4.3 (P5): stesso comportamento per icp-builder. Se c'è un ICP in DB, nascondi il form e mostra "Rianalizza".
+  const isIcpBuilderWithCache = skill.id === "icp-builder" && loadedFromCache && !forceNewRun;
+  const showCacheBanner = isAutoProfileWithCache || isIcpBuilderWithCache;
+  const hideFormBecauseCache = showCacheBanner;
 
   return (
     <AppLayout>
@@ -1617,8 +1676,8 @@ export default function SkillPage() {
           </div>
         </div>
 
-        {/* Form (nascosto se c'è cache per auto-profile-setup) */}
-        {!isAutoProfileWithCache && (
+        {/* Form (nascosto se c'è cache: auto-profile-setup o icp-builder) */}
+        {!hideFormBecauseCache && (
           <Card className="bg-card/80 border-border/50 backdrop-blur-sm animate-in">
             <CardContent className="p-6">
               <SkillForm skillId={skill.id} onSubmit={handleSubmit} loading={loading} />
@@ -1632,12 +1691,16 @@ export default function SkillPage() {
           </Card>
         )}
 
-        {/* Banner cache caricata */}
-        {isAutoProfileWithCache && (
+        {/* Banner cache caricata (auto-profile-setup o icp-builder) */}
+        {showCacheBanner && (
           <div className="flex items-center justify-between gap-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 animate-in">
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle className="h-4 w-4 text-blue-400 shrink-0" />
-              <span>Stai vedendo l'ultima analisi salvata.</span>
+              <span>
+                {isIcpBuilderWithCache
+                  ? "Stai vedendo l'ultimo ICP salvato."
+                  : "Stai vedendo l'ultima analisi salvata."}
+              </span>
             </div>
             <Button
               size="sm"
@@ -1646,7 +1709,7 @@ export default function SkillPage() {
               onClick={() => navigate(`/skill/${skill.id}?force=1`)}
             >
               <RefreshCw className="h-3 w-3 mr-1.5" />
-              Rianalizza
+              {isIcpBuilderWithCache ? "Ricostruisci ICP" : "Rianalizza"}
             </Button>
           </div>
         )}
