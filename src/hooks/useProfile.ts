@@ -73,7 +73,7 @@ export function useProfile() {
     // Se una fallisce non blocchiamo il fetch (failsafe).
     const [scrapeReset, skillRunsReset] = await Promise.all([
       supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
-      supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
+      (supabase.rpc as any)("reset_skill_runs_if_due", { p_user_id: user.id }),
     ]);
     if (scrapeReset.error) {
       // eslint-disable-next-line no-console
@@ -171,7 +171,7 @@ export function useProfile() {
       // 1. Riaccredita se dovuto (entrambe le quote, in parallelo).
       await Promise.all([
         supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
-        supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
+        (supabase.rpc as any)("reset_skill_runs_if_due", { p_user_id: user.id }),
       ]);
 
       // 2. Rileggi i contatori freschi dal DB.

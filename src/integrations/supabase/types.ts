@@ -63,6 +63,7 @@ export type Database = {
           scrapes_reset_at: string | null
           scrapes_used_today: number
           skill_runs_limit: number
+          skill_runs_reset_at: string | null
           skill_runs_used: number
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -87,6 +88,7 @@ export type Database = {
           scrapes_reset_at?: string | null
           scrapes_used_today?: number
           skill_runs_limit?: number
+          skill_runs_reset_at?: string | null
           skill_runs_used?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -111,6 +113,7 @@ export type Database = {
           scrapes_reset_at?: string | null
           scrapes_used_today?: number
           skill_runs_limit?: number
+          skill_runs_reset_at?: string | null
           skill_runs_used?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -225,6 +228,10 @@ export type Database = {
     Functions: {
       reset_daily_scrapes: { Args: never; Returns: undefined }
       reset_scrape_quota_if_due: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      reset_skill_runs_if_due: {
         Args: { p_user_id: string }
         Returns: undefined
       }
