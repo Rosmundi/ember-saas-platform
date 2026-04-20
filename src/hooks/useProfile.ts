@@ -3,6 +3,7 @@
 // Sostituisce mockProfile ovunque nel frontend.
 
 import { useEffect, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Profile, BusinessProfile, PlanType } from "@/lib/ember-types";
@@ -56,10 +57,10 @@ export function useProfile() {
   const [error, setError] = useState<string | null>(null);
 
   // Carica profilo.
-  // v3.4.2 fix: prima del SELECT chiama l'RPC atomica reset_scrape_quota_if_due,
-  // che resetta scrapes_used_today SE scrapes_reset_at è scaduto. L'atomicità è
-  // garantita dal WHERE scrapes_reset_at < now() lato SQL: no race condition
-  // anche con più tab aperte.
+  // v3.4.2 fix M1: se la SELECT torna null (profilo inesistente per nuovo utente,
+  // trigger handle_new_user fallito o RLS), chiama RPC bootstrap_profile_if_missing
+  // e ritenta UNA VOLTA. Evita loop loading infinito.
+  // v3.4.2 fix: prima del SELECT chiama le RPC atomiche di reset quote (scrape giornaliera + skill_runs mensile).
   const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
@@ -69,11 +70,10 @@ export function useProfile() {
     setLoading(true);
     setError(null);
 
-    // Tenta il riaccredito di entrambe le quote in parallelo (daily scrape + monthly skill_runs).
-    // Se una fallisce non blocchiamo il fetch (failsafe).
+    // Tenta il riaccredito di entrambe le quote in parallelo (failsafe se una fallisce).
     const [scrapeReset, skillRunsReset] = await Promise.all([
       supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
-      (supabase.rpc as any)("reset_skill_runs_if_due", { p_user_id: user.id }),
+      supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
     ]);
     if (scrapeReset.error) {
       // eslint-disable-next-line no-console
@@ -88,11 +88,42 @@ export function useProfile() {
 
     if (err) {
       setError(err.message);
+      toast.error("Errore caricamento profilo", { description: err.message });
       setLoading(false);
       return;
     }
+
     if (data) {
       setProfile(rowToProfile(data as unknown as ProfileRow));
+      setLoading(false);
+      return;
+    }
+
+    // v3.4.2 M1: profilo non trovato → tenta bootstrap on-demand, poi re-fetch.
+    // eslint-disable-next-line no-console
+    console.warn("[useProfile] Profilo non trovato per user", user.id, "→ tentativo bootstrap.");
+    const { error: bootstrapErr } = await (supabase.rpc as any)("bootstrap_profile_if_missing", { p_user_id: user.id });
+    if (bootstrapErr) {
+      const msg = `Impossibile creare il profilo: ${bootstrapErr.message}`;
+      setError(msg);
+      toast.error("Bootstrap profilo fallito", { description: msg });
+      setLoading(false);
+      return;
+    }
+
+    const { data: data2, error: err2 } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (err2 || !data2) {
+      const msg = err2?.message || "Profilo non disponibile dopo bootstrap. Contatta supporto.";
+      setError(msg);
+      toast.error("Profilo non disponibile", { description: msg });
+    } else {
+      setProfile(rowToProfile(data2 as unknown as ProfileRow));
+      toast.success("Profilo creato", { description: "Pronto per l'onboarding." });
     }
     setLoading(false);
   }, [user]);
@@ -100,6 +131,12 @@ export function useProfile() {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  // v3.4.2 fix M3: helper per gestire errori update con toast esplicito.
+  const handleUpdateError = (action: string, msg: string) => {
+    setError(msg);
+    toast.error(`${action} fallito`, { description: msg });
+  };
 
   // Aggiorna campi profilo
   const updateProfile = useCallback(
@@ -110,7 +147,7 @@ export function useProfile() {
         .update(updates as any)
         .eq("user_id", user.id);
       if (err) {
-        setError(err.message);
+        handleUpdateError("Aggiornamento profilo", err.message);
         return;
       }
       await fetchProfile();
@@ -132,7 +169,7 @@ export function useProfile() {
         } as any)
         .eq("user_id", user.id);
       if (err) {
-        setError(err.message);
+        handleUpdateError("Salvataggio onboarding", err.message);
         return;
       }
       await fetchProfile();
@@ -149,7 +186,7 @@ export function useProfile() {
         .update({ raw_profile_data: newRawData as any } as any)
         .eq("user_id", user.id);
       if (err) {
-        setError(err.message);
+        handleUpdateError("Salvataggio analisi", err.message);
         return;
       }
       await fetchProfile();
@@ -158,12 +195,8 @@ export function useProfile() {
   );
 
   // Incrementa contatori dopo skill run.
-  // v3.4.2 fix: chiama reset_scrape_quota_if_due PRIMA di rileggere il profilo
-  // fresh dal DB, così se l'utente ha la pagina aperta da più di 24h, il
-  // contatore viene azzerato prima di essere incrementato.
-  // Rileggere i contatori dal DB (invece di usare lo state React) evita race
-  // condition con altre tab e rende l'incremento corretto anche se il reset
-  // è appena avvenuto.
+  // Chiama prima i reset RPC, poi rilegge i contatori freschi e incrementa.
+  // Evita race condition con altre tab e gestisce reset appena avvenuto.
   const consumeSkillRun = useCallback(
     async (isScrape: boolean) => {
       if (!user || !profile) return;
@@ -171,15 +204,22 @@ export function useProfile() {
       // 1. Riaccredita se dovuto (entrambe le quote, in parallelo).
       await Promise.all([
         supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
-        (supabase.rpc as any)("reset_skill_runs_if_due", { p_user_id: user.id }),
+        supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
       ]);
 
       // 2. Rileggi i contatori freschi dal DB.
-      const { data: fresh } = await supabase
+      const { data: fresh, error: freshErr } = await supabase
         .from("profiles")
         .select("skill_runs_used, scrapes_used_today")
         .eq("user_id", user.id)
         .maybeSingle();
+
+      if (freshErr) {
+        // v3.4.2 M3: errore lettura fresca → warning soft, procediamo con stato locale.
+        // eslint-disable-next-line no-console
+        console.warn("[useProfile] consumeSkillRun fresh read failed:", freshErr.message);
+        toast.warning("Lettura quota imprecisa", { description: "Contatori potrebbero essere disallineati." });
+      }
 
       const currentSkillRuns = (fresh as any)?.skill_runs_used ?? profile.skill_runs_used;
       const currentScrapes = (fresh as any)?.scrapes_used_today ?? profile.scrapes_used_today;
