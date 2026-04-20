@@ -670,16 +670,23 @@ function SkillOutput({
       }
       if (Array.isArray(v)) {
         if (v.length === 0) return <span className="text-muted-foreground">—</span>;
+        // v3.4.2 fix: array di primitive → bullet list (era join(', '))
         if (v.every((x) => typeof x === "string" || typeof x === "number")) {
-          return <span className="font-medium text-sm">{v.join(", ")}</span>;
+          return (
+            <ul className="list-disc list-outside ml-4 space-y-0.5 text-sm font-medium">
+              {v.map((x, i) => (
+                <li key={i}>{String(x)}</li>
+              ))}
+            </ul>
+          );
         }
         return (
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {v.map((x, i) => (
-              <li key={i} className="text-sm font-medium">
+              <li key={i} className="text-sm font-medium border-l-2 border-primary/30 pl-2">
                 {typeof x === "object" && x !== null
                   ? Object.entries(x).map(([kk, vv]) => (
-                      <div key={kk} className="ml-2">
+                      <div key={kk}>
                         <span className="text-muted-foreground text-xs capitalize">{kk.replace(/_/g, " ")}: </span>
                         {typeof vv === "string" ? vv : Array.isArray(vv) ? vv.join(", ") : JSON.stringify(vv)}
                       </div>
@@ -782,7 +789,10 @@ function SkillOutput({
             </div>
           </div>
         )}
-        <Link to={`/skill/prospect-finder?icp=${encodeURIComponent(JSON.stringify(data.icp || {}))}`}>
+        {/* v3.4.2 fix B: niente query string. L'ICP è già in localStorage da handleSubmit,
+            così evitiamo URL troppo lunghi e doppia source-of-truth. Il form prospect-finder
+            legge ember:last_icp e mostra banner "ICP precompilato". */}
+        <Link to="/skill/prospect-finder">
           <Button className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg shadow-primary/20">
             Cerca prospect con questo ICP <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
@@ -1434,7 +1444,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as unknown as Record<string, unknown> | null,
+      profile.business_profile as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1466,18 +1476,22 @@ export default function SkillPage() {
         }
       }
 
-      // v3.4.2 fix (P4): persistenza ICP in localStorage così il form prospect-finder
+      // v3.4.2 fix (P4 + B): persistenza ICP in localStorage così il form prospect-finder
       // può precompilarsi anche se l'utente naviga via e torna dopo.
+      // Fix B: se data.icp non esiste (schema backend diverso), usa l'intero `data` come ICP
+      // così il flusso non si rompe e la textarea prospect-finder è comunque popolata.
       // Phase 2 TODO: migrare su tabella `icps` con history.
       if (skill.id === "icp-builder") {
         try {
-          const data = result.data as any;
-          if (data?.icp) {
+          const data = (result.data ?? {}) as any;
+          // fallback: se non c'è data.icp, considera tutto data come ICP
+          const icpPayload = data?.icp ?? data;
+          if (icpPayload && typeof icpPayload === "object" && Object.keys(icpPayload).length > 0) {
             localStorage.setItem(
               "ember:last_icp",
               JSON.stringify({
                 generated_at: new Date().toISOString(),
-                icp: data.icp,
+                icp: icpPayload,
                 buyer_personas: data.buyer_personas ?? null,
                 linkedin_search_query: data.linkedin_search_query ?? null,
                 trigger_events: data.trigger_events ?? null,
@@ -1485,6 +1499,9 @@ export default function SkillPage() {
                 user_input: formValues.description || "",
               }),
             );
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn("[SkillPage] icp-builder: nessun payload utile da salvare in localStorage");
           }
         } catch (e) {
           // quota localStorage piena o privacy mode → ignora silente, non bloccare flow
@@ -1495,8 +1512,7 @@ export default function SkillPage() {
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
-      const msg = emberErrorMessage(err);
+      const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1505,7 +1521,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
     }
 
@@ -1566,16 +1582,15 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
-      toast.error(emberErrorMessage(err));
+      toast.error(emberErrorMessage(result.error));
     }
 
     setRegeneratingSection(null);
