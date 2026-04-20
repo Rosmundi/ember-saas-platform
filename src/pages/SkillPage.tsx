@@ -1434,7 +1434,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as Record<string, unknown> | null,
+      profile.business_profile as unknown as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1495,7 +1495,8 @@ export default function SkillPage() {
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const msg = emberErrorMessage(result.error);
+      const err = (result as Extract<typeof result, { ok: false }>).error;
+      const msg = emberErrorMessage(err);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1504,7 +1505,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: err.message,
       });
     }
 
@@ -1565,15 +1566,16 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
+      const err = (result as Extract<typeof result, { ok: false }>).error;
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: err.message,
       });
-      toast.error(emberErrorMessage(result.error));
+      toast.error(emberErrorMessage(err));
     }
 
     setRegeneratingSection(null);

@@ -226,6 +226,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bootstrap_profile_if_missing: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       reset_daily_scrapes: { Args: never; Returns: undefined }
       reset_scrape_quota_if_due: {
         Args: { p_user_id: string }
