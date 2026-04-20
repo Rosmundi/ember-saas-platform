@@ -670,11 +670,9 @@ function SkillOutput({
       }
       if (Array.isArray(v)) {
         if (v.length === 0) return <span className="text-muted-foreground">—</span>;
-        // array di primitive → join
         if (v.every((x) => typeof x === "string" || typeof x === "number")) {
           return <span className="font-medium text-sm">{v.join(", ")}</span>;
         }
-        // array di oggetti → lista compatta
         return (
           <ul className="space-y-1">
             {v.map((x, i) => (
@@ -693,7 +691,6 @@ function SkillOutput({
         );
       }
       if (typeof v === "object") {
-        // oggetto nested → mini-grid di key/value
         return (
           <div className="space-y-0.5">
             {Object.entries(v as Record<string, unknown>).map(([kk, vv]) => (
@@ -715,10 +712,14 @@ function SkillOutput({
         <CardContent className="p-5 space-y-3">
           <div className="flex items-baseline gap-3 flex-wrap">
             <h4 className="font-semibold text-base">{String(bp.nome ?? `Persona ${i + 1}`)}</h4>
-            {bp.ruolo && <span className="text-xs text-primary/70">{String(bp.ruolo)}</span>}
-            {(bp.età || bp.eta) && <span className="text-xs text-muted-foreground">· {String(bp.età ?? bp.eta)}</span>}
+            {bp.ruolo != null && <span className="text-xs text-primary/70">{String(bp.ruolo)}</span>}
+            {(bp.età != null || bp.eta != null) && (
+              <span className="text-xs text-muted-foreground">· {String(bp.età ?? bp.eta)}</span>
+            )}
           </div>
-          {bp.background && <p className="text-sm text-muted-foreground leading-relaxed">{String(bp.background)}</p>}
+          {bp.background != null && (
+            <p className="text-sm text-muted-foreground leading-relaxed">{String(bp.background)}</p>
+          )}
           <div className="grid sm:grid-cols-2 gap-3">
             {Object.entries(bp).map(([k, v]) => {
               if (["nome", "ruolo", "età", "eta", "background"].includes(k)) return null;
@@ -1000,6 +1001,34 @@ function SkillOutput({
 
 // ============ SKILL FORM ============
 
+// v3.4.2 fix (P4): helper per serializzare un oggetto ICP in testo leggibile per la textarea prospect-finder.
+// Appiattisce campi noti (settore, dimensione_azienda, ruolo_decisore, pain_points, trigger_events).
+function formatIcpForTextarea(icp: any): string {
+  if (!icp || typeof icp !== "object") return typeof icp === "string" ? icp : "";
+  const out: string[] = [];
+  const flat = (v: any): string => {
+    if (v == null) return "";
+    if (typeof v === "string" || typeof v === "number") return String(v);
+    if (Array.isArray(v)) {
+      if (v.every((x) => typeof x === "string" || typeof x === "number")) return v.join(", ");
+      return v
+        .map((x) => (typeof x === "object" ? x.descrizione || x.nome || JSON.stringify(x) : String(x)))
+        .join("; ");
+    }
+    if (typeof v === "object")
+      return Object.entries(v)
+        .map(([k, vv]) => `${k}: ${flat(vv)}`)
+        .join(", ");
+    return String(v);
+  };
+  for (const [k, v] of Object.entries(icp)) {
+    const label = k.replace(/_/g, " ").replace(/^./, (s) => s.toUpperCase());
+    const val = flat(v);
+    if (val) out.push(`${label}: ${val}`);
+  }
+  return out.join("\n\n");
+}
+
 function SkillForm({
   skillId,
   onSubmit,
@@ -1012,6 +1041,18 @@ function SkillForm({
   const [searchParams] = useSearchParams();
   const { profile } = useProfile();
 
+  // v3.4.2 fix (P4): stato dell'ICP salvato in localStorage, per mostrare banner nel prospect-finder.
+  const [storedIcp, setStoredIcp] = useState<{ generated_at: string; user_input?: string } | null>(() => {
+    if (skillId !== "prospect-finder") return null;
+    try {
+      const raw = localStorage.getItem("ember:last_icp");
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      return { generated_at: obj.generated_at || "", user_input: obj.user_input || "" };
+    } catch {
+      return null;
+    }
+  });
   // v3.4.2 fix (P1): helper per costruire il testo pre-compilato del campo
   // "description" di icp-builder a partire da raw_profile_data.target_buyer.
   // Ritorna '' se il profilo non ha ancora l'analisi completa.
@@ -1031,13 +1072,34 @@ function SkillForm({
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     // v3.4.1 fix (H3): precompila URL LinkedIn dal profilo o dalla query string
+    // così "Rianalizza" dalla Dashboard non costringe a reincollare l'URL.
     if (skillId === "auto-profile-setup") {
       init.url = searchParams.get("url") || profile?.linkedin_url || "";
     }
     if (skillId === "visual-post-builder") init.post = searchParams.get("post") || "";
+    // v3.4.2 fix (P4): prospect-finder — priorità: query string > ICP salvato in localStorage.
+    // Serializziamo l'ICP come testo leggibile nella textarea "query", non come JSON raw.
     if (skillId === "prospect-finder") {
-      const icp = searchParams.get("icp");
-      if (icp) init.query = icp;
+      const icpFromUrl = searchParams.get("icp");
+      if (icpFromUrl) {
+        // tentativo parse: se è JSON lo serializziamo leggibile; se è già testo lo usiamo così
+        try {
+          const parsed = JSON.parse(icpFromUrl);
+          init.query = formatIcpForTextarea(parsed);
+        } catch {
+          init.query = icpFromUrl;
+        }
+      } else {
+        try {
+          const stored = localStorage.getItem("ember:last_icp");
+          if (stored) {
+            const obj = JSON.parse(stored);
+            if (obj?.icp) init.query = formatIcpForTextarea(obj.icp);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     }
     if (skillId === "outreach-drafter") {
       init.nome = searchParams.get("nome") || "";
@@ -1045,6 +1107,7 @@ function SkillForm({
       init.azienda = searchParams.get("azienda") || "";
     }
     // v3.4.2 fix (P1): precompila ICP builder con target dal profilo analizzato.
+    // Priorità: query string ?description= > raw_profile_data.target_buyer.
     if (skillId === "icp-builder") {
       const fromUrl = searchParams.get("description") || "";
       init.description = fromUrl || buildIcpPrefill(profile);
@@ -1052,7 +1115,7 @@ function SkillForm({
     return init;
   });
 
-  // Se il profilo si carica dopo il mount, sync URL
+  // Se il profilo si carica dopo il mount, aggiorna i campi dipendenti una volta sola.
   useEffect(() => {
     if (skillId === "auto-profile-setup" && !values.url && profile?.linkedin_url) {
       setValues((prev) => ({ ...prev, url: profile.linkedin_url || "" }));
@@ -1060,7 +1123,8 @@ function SkillForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.linkedin_url]);
 
-  // v3.4.2 fix (P1): sync ICP prefill se raw_profile_data arriva tardi.
+  // v3.4.2 fix (P1): sync ICP prefill quando raw_profile_data arriva tardi.
+  // Solo se il campo è ancora vuoto (non sovrascrive input manuale dell'utente).
   useEffect(() => {
     if (skillId === "icp-builder" && !values.description) {
       const pre = buildIcpPrefill(profile);
@@ -1172,8 +1236,47 @@ function SkillForm({
     );
   }
   if (skillId === "prospect-finder") {
+    // v3.4.2 fix (P4): banner informativo se il campo query è stato precompilato da ICP salvato.
+    const hasPrefilledIcp = !!storedIcp && !!values.query;
+    const clearIcp = () => {
+      try {
+        localStorage.removeItem("ember:last_icp");
+      } catch {
+        /* ignore */
+      }
+      setStoredIcp(null);
+      set("query", "");
+    };
+    const formatDate = (iso: string) => {
+      try {
+        return new Date(iso).toLocaleString("it-IT", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } catch {
+        return "";
+      }
+    };
     return (
       <div className="space-y-4">
+        {hasPrefilledIcp && storedIcp && (
+          <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-primary mb-0.5">ICP precompilato</p>
+              <p className="text-xs text-muted-foreground">
+                Costruito il {formatDate(storedIcp.generated_at)}
+                {storedIcp.user_input
+                  ? ` · "${storedIcp.user_input.slice(0, 60)}${storedIcp.user_input.length > 60 ? "…" : ""}"`
+                  : ""}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearIcp} className="text-xs hover:text-destructive shrink-0">
+              Rimuovi
+            </Button>
+          </div>
+        )}
         <Input
           placeholder="URL LinkedIn del prospect"
           value={values.url || ""}
@@ -1185,7 +1288,7 @@ function SkillForm({
           value={values.query || ""}
           onChange={(e) => set("query", e.target.value)}
           className="bg-surface border-border/50 focus:border-primary transition-colors"
-          rows={2}
+          rows={hasPrefilledIcp ? 6 : 2}
         />
         {submitBtn}
       </div>
@@ -1331,7 +1434,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as unknown as Record<string, unknown> | null,
+      profile.business_profile as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1363,10 +1466,36 @@ export default function SkillPage() {
         }
       }
 
+      // v3.4.2 fix (P4): persistenza ICP in localStorage così il form prospect-finder
+      // può precompilarsi anche se l'utente naviga via e torna dopo.
+      // Phase 2 TODO: migrare su tabella `icps` con history.
+      if (skill.id === "icp-builder") {
+        try {
+          const data = result.data as any;
+          if (data?.icp) {
+            localStorage.setItem(
+              "ember:last_icp",
+              JSON.stringify({
+                generated_at: new Date().toISOString(),
+                icp: data.icp,
+                buyer_personas: data.buyer_personas ?? null,
+                linkedin_search_query: data.linkedin_search_query ?? null,
+                trigger_events: data.trigger_events ?? null,
+                exclusioni: data.exclusioni ?? null,
+                user_input: formValues.description || "",
+              }),
+            );
+          }
+        } catch (e) {
+          // quota localStorage piena o privacy mode → ignora silente, non bloccare flow
+          // eslint-disable-next-line no-console
+          console.warn("[SkillPage] localStorage set failed:", e);
+        }
+      }
+
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
-      const msg = emberErrorMessage(err);
+      const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1375,7 +1504,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
     }
 
@@ -1436,16 +1565,15 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
-      const err = (result as Extract<typeof result, { ok: false }>).error;
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: err.message,
+        error_message: result.error.message,
       });
-      toast.error(emberErrorMessage(err));
+      toast.error(emberErrorMessage(result.error));
     }
 
     setRegeneratingSection(null);
