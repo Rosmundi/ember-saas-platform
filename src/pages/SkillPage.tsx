@@ -662,48 +662,123 @@ function SkillOutput({
   }
 
   if (skillId === "icp-builder") {
+    // v3.4.2 fix (P3): renderer tipizzato per gestire strutture nested (oggetti, array di oggetti).
+    const renderValue = (v: unknown): React.ReactNode => {
+      if (v == null) return <span className="text-muted-foreground">—</span>;
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+        return <span className="font-medium text-sm">{String(v)}</span>;
+      }
+      if (Array.isArray(v)) {
+        if (v.length === 0) return <span className="text-muted-foreground">—</span>;
+        // array di primitive → join
+        if (v.every((x) => typeof x === "string" || typeof x === "number")) {
+          return <span className="font-medium text-sm">{v.join(", ")}</span>;
+        }
+        // array di oggetti → lista compatta
+        return (
+          <ul className="space-y-1">
+            {v.map((x, i) => (
+              <li key={i} className="text-sm font-medium">
+                {typeof x === "object" && x !== null
+                  ? Object.entries(x).map(([kk, vv]) => (
+                      <div key={kk} className="ml-2">
+                        <span className="text-muted-foreground text-xs capitalize">{kk.replace(/_/g, " ")}: </span>
+                        {typeof vv === "string" ? vv : Array.isArray(vv) ? vv.join(", ") : JSON.stringify(vv)}
+                      </div>
+                    ))
+                  : String(x)}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+      if (typeof v === "object") {
+        // oggetto nested → mini-grid di key/value
+        return (
+          <div className="space-y-0.5">
+            {Object.entries(v as Record<string, unknown>).map(([kk, vv]) => (
+              <div key={kk} className="text-sm">
+                <span className="text-muted-foreground text-xs capitalize">{kk.replace(/_/g, " ")}: </span>
+                <span className="font-medium">
+                  {Array.isArray(vv) ? vv.join(", ") : typeof vv === "object" ? JSON.stringify(vv) : String(vv)}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return <span>{String(v)}</span>;
+    };
+
+    const renderPersona = (bp: Record<string, unknown>, i: number) => (
+      <Card key={i} className="bg-surface/50 border-border/30">
+        <CardContent className="p-5 space-y-3">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h4 className="font-semibold text-base">{String(bp.nome ?? `Persona ${i + 1}`)}</h4>
+            {bp.ruolo && <span className="text-xs text-primary/70">{String(bp.ruolo)}</span>}
+            {(bp.età || bp.eta) && <span className="text-xs text-muted-foreground">· {String(bp.età ?? bp.eta)}</span>}
+          </div>
+          {bp.background && <p className="text-sm text-muted-foreground leading-relaxed">{String(bp.background)}</p>}
+          <div className="grid sm:grid-cols-2 gap-3">
+            {Object.entries(bp).map(([k, v]) => {
+              if (["nome", "ruolo", "età", "eta", "background"].includes(k)) return null;
+              return (
+                <div key={k} className="p-2 rounded-lg bg-background/30">
+                  <span className="text-muted-foreground capitalize text-xs block mb-1">{k.replace(/_/g, " ")}</span>
+                  {renderValue(v)}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+    const searchQueries: string[] = Array.isArray(data.linkedin_search_query)
+      ? (data.linkedin_search_query as unknown[]).filter((x): x is string => typeof x === "string")
+      : typeof data.linkedin_search_query === "string"
+        ? [data.linkedin_search_query]
+        : [];
+
     return (
       <div className="space-y-5 animate-in">
         {data.icp && (
           <Card className="bg-surface/50 border-border/30">
             <CardContent className="p-5">
               <h3 className="font-semibold mb-4">ICP Card</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid sm:grid-cols-2 gap-3 text-sm">
                 {Object.entries(data.icp).map(([k, v]) => (
-                  <div key={k} className="p-2 rounded-lg bg-background/30">
-                    <span className="text-muted-foreground capitalize text-xs block mb-0.5">
-                      {k.replace(/_/g, " ")}
-                    </span>
-                    <span className="font-medium text-sm">
-                      {Array.isArray(v) ? (v as string[]).join(", ") : String(v)}
-                    </span>
+                  <div key={k} className="p-3 rounded-lg bg-background/30">
+                    <span className="text-muted-foreground capitalize text-xs block mb-1">{k.replace(/_/g, " ")}</span>
+                    {renderValue(v)}
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         )}
-        {data.linkedin_search_query && (
+        {searchQueries.length > 0 && (
           <div>
             <h3 className="font-semibold mb-2">Sales Navigator Query</h3>
-            <div className="bg-surface/50 border border-border/30 rounded-xl p-4 font-mono text-sm">
-              {data.linkedin_search_query}
-              <div className="mt-2">
-                <CopyButton text={data.linkedin_search_query} />
-              </div>
+            <div className="space-y-2">
+              {searchQueries.map((q, i) => (
+                <div
+                  key={i}
+                  className="bg-surface/50 border border-border/30 rounded-xl p-4 font-mono text-xs flex items-start justify-between gap-3"
+                >
+                  <span className="flex-1 break-all">{q}</span>
+                  <CopyButton text={q} />
+                </div>
+              ))}
             </div>
           </div>
         )}
-        {data.buyer_personas && (
+        {Array.isArray(data.buyer_personas) && data.buyer_personas.length > 0 && (
           <div>
             <h3 className="font-semibold mb-2">Buyer Personas</h3>
-            {data.buyer_personas.map((bp: any, i: number) => (
-              <div key={i} className="bg-surface/50 border border-border/30 rounded-xl p-4 mb-2">
-                <pre className="text-sm whitespace-pre-wrap">
-                  {typeof bp === "string" ? bp : JSON.stringify(bp, null, 2)}
-                </pre>
-              </div>
-            ))}
+            <div className="space-y-3">
+              {(data.buyer_personas as Record<string, unknown>[]).map((bp, i) => renderPersona(bp, i))}
+            </div>
           </div>
         )}
         <Link to={`/skill/prospect-finder?icp=${encodeURIComponent(JSON.stringify(data.icp || {}))}`}>
