@@ -4,6 +4,7 @@ import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom"
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SKILLS, canUseSkill } from "@/lib/ember-types";
 import { callSkill, callRegenerateSection, emberErrorMessage } from "@/lib/ember-api";
+import type { EmberResult } from "@/lib/ember-api";
 import { useProfile } from "@/hooks/useProfile";
 import { useSkillRuns } from "@/hooks/useSkillRuns";
 import { useAuth } from "@/contexts/AuthContext";
@@ -115,6 +116,17 @@ function buildPayload(
     default:
       return values;
   }
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function isEmberErrorResult<T>(
+  result: EmberResult<T>,
+): result is Extract<EmberResult<T>, { ok: false }> {
+  return result.ok === false;
 }
 
 // ============ SECTION CARD (auto-profile-setup) ============
