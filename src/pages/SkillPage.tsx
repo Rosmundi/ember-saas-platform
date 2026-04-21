@@ -1597,7 +1597,11 @@ export default function SkillPage() {
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
-      const msg = emberErrorMessage(result.error);
+      // v3.4.4: cast esplicito perché in alcune config TS strict il narrowing della discriminated
+      // union si perde (probabilmente per via dei generics di callSkill<T>). Il tipo a runtime è
+      // corretto: se result.ok === false, error è sempre presente (vedi EmberResult in ember-api.ts).
+      const errResult = result as Extract<typeof result, { ok: false }>;
+      const msg = emberErrorMessage(errResult.error);
       setError(msg);
       toast.error(msg);
       await logRun({
@@ -1606,7 +1610,7 @@ export default function SkillPage() {
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: errResult.error.message,
       });
     }
 
@@ -1667,15 +1671,17 @@ export default function SkillPage() {
 
       toast.success(`${sectionName} rigenerata`);
     } else {
+      // v3.4.4: stesso cast del blocco sopra (narrowing TS perso con generics)
+      const errResult = result as Extract<typeof result, { ok: false }>;
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
         output: null,
         status: "error",
         is_scrape: false,
-        error_message: result.error.message,
+        error_message: errResult.error.message,
       });
-      toast.error(emberErrorMessage(result.error));
+      toast.error(emberErrorMessage(errResult.error));
     }
 
     setRegeneratingSection(null);
