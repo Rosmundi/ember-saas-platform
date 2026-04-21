@@ -1510,12 +1510,7 @@ export default function SkillPage() {
     setError(null);
     setLoadedFromCache(false);
 
-    const payload = buildPayload(
-      skill.id,
-      formValues,
-      profile.business_profile as Record<string, unknown> | null,
-      user.id,
-    );
+    const payload = buildPayload(skill.id, formValues, toRecord(profile.business_profile), user.id);
     const result = await callSkill(skill.id, payload);
 
     if (result.ok) {
@@ -1580,7 +1575,7 @@ export default function SkillPage() {
       }
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
-    } else {
+    } else if (isEmberErrorResult(result)) {
       const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
@@ -1619,7 +1614,7 @@ export default function SkillPage() {
       section: sectionName,
       stato_attuale: section.stato_attuale || "",
       current_rewrite: section.riscrittura || "",
-      profile_context: (data.profilo_business || profile.business_profile || {}) as Record<string, unknown>,
+      profile_context: toRecord(data.profilo_business) ?? toRecord(profile.business_profile) ?? {},
       user_feedback: feedback || undefined,
     });
 
@@ -1650,7 +1645,7 @@ export default function SkillPage() {
       await consumeSkillRun(false);
 
       toast.success(`${sectionName} rigenerata`);
-    } else {
+    } else if (isEmberErrorResult(result)) {
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
