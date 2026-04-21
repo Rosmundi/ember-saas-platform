@@ -1506,7 +1506,7 @@ export default function SkillPage() {
     const payload = buildPayload(
       skill.id,
       formValues,
-      profile.business_profile as Record<string, unknown> | null,
+      profile.business_profile as unknown as Record<string, unknown> | null,
       user.id,
     );
     const result = await callSkill(skill.id, payload);
@@ -1635,7 +1635,7 @@ export default function SkillPage() {
       section: sectionName,
       stato_attuale: section.stato_attuale || "",
       current_rewrite: section.riscrittura || "",
-      profile_context: (data.profilo_business || profile.business_profile || {}) as Record<string, unknown>,
+      profile_context: (data.profilo_business || profile.business_profile || {}) as unknown as Record<string, unknown>,
       user_feedback: feedback || undefined,
     });
 
