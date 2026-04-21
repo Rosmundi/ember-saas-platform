@@ -4,10 +4,10 @@ import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom"
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SKILLS, canUseSkill } from "@/lib/ember-types";
 import { callSkill, callRegenerateSection, emberErrorMessage } from "@/lib/ember-api";
-import type { EmberResult } from "@/lib/ember-api";
 import { useProfile } from "@/hooks/useProfile";
 import { useSkillRuns } from "@/hooks/useSkillRuns";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,17 +116,6 @@ function buildPayload(
     default:
       return values;
   }
-}
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
-function isEmberErrorResult<T>(
-  result: EmberResult<T>,
-): result is Extract<EmberResult<T>, { ok: false }> {
-  return result.ok === false;
 }
 
 // ============ SECTION CARD (auto-profile-setup) ============
@@ -801,14 +790,18 @@ function SkillOutput({
             </div>
           </div>
         )}
-        {/* v3.4.2 fix B: niente query string. L'ICP è già in localStorage da handleSubmit,
-            così evitiamo URL troppo lunghi e doppia source-of-truth. Il form prospect-finder
-            legge ember:last_icp e mostra banner "ICP precompilato". */}
-        <Link to="/skill/prospect-finder">
-          <Button className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg shadow-primary/20">
+        {/* v3.4.2 fix B: niente query string. L'ICP è già in DB (raw_profile_data.icp_current)
+            e in localStorage come fallback. Il form prospect-finder legge da DB e precompila.
+            v3.4.4 fix: usiamo <Button asChild><Link> per evitare <button> dentro <a> (HTML invalido
+            che causava click "mangiato" e navigation fallita in alcuni browser). */}
+        <Button
+          asChild
+          className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg shadow-primary/20"
+        >
+          <Link to="/skill/prospect-finder">
             Cerca prospect con questo ICP <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -1510,7 +1503,12 @@ export default function SkillPage() {
     setError(null);
     setLoadedFromCache(false);
 
-    const payload = buildPayload(skill.id, formValues, toRecord(profile.business_profile), user.id);
+    const payload = buildPayload(
+      skill.id,
+      formValues,
+      profile.business_profile as Record<string, unknown> | null,
+      user.id,
+    );
     const result = await callSkill(skill.id, payload);
 
     if (result.ok) {
@@ -1525,14 +1523,37 @@ export default function SkillPage() {
       });
       await consumeSkillRun(skill.usesScraping);
 
+      // v3.4.4 fix (bug persistenza ICP): TUTTI i salvataggi su raw_profile_data usano merge
+      // difensivo leggendo lo stato fresco dal DB, così non sovrascriviamo chiavi scritte in
+      // parallelo (es. icp_current scritto da icp-builder viene preservato da auto-profile-setup).
+      // Motivo: `profile` nella closure di handleSubmit è potenzialmente stale dopo consumeSkillRun.
+      async function mergeRawProfileData(patch: Record<string, unknown>) {
+        try {
+          const { data: fresh } = await supabase
+            .from("profiles")
+            .select("raw_profile_data")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          const currentRaw = ((fresh as any)?.raw_profile_data || {}) as Record<string, unknown>;
+          await updateRawProfileData({ ...currentRaw, ...patch });
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[SkillPage] mergeRawProfileData failed, falling back to stale merge:", e);
+          const currentRaw = (profile.raw_profile_data || {}) as Record<string, unknown>;
+          await updateRawProfileData({ ...currentRaw, ...patch });
+        }
+      }
+
       // Persist auto-profile-setup analysis on profile
       // v3.4.1 fix (B2): NON sovrascrivere business_profile (ha campi custom da Onboarding:
       // tone_of_voice, value_proposition, punti_forza, tags) con il sotto-set di 5 campi
       // restituito dal prompt. Salviamo solo raw_profile_data e, se cambiato, linkedin_url.
+      // v3.4.4 fix: MERGE invece di overwrite. Prima scriveva `updateRawProfileData(data)` che
+      // cancellava icp_current se presente. Ora preserviamo tutte le altre chiavi.
       if (skill.id === "auto-profile-setup") {
         const data = result.data as any;
         if (data?.score_totale) {
-          await updateRawProfileData(data);
+          await mergeRawProfileData(data);
           const newUrl = formValues.url?.trim();
           if (newUrl && newUrl !== profile.linkedin_url) {
             await updateProfile({ linkedin_url: newUrl });
@@ -1544,6 +1565,7 @@ export default function SkillPage() {
       // L'ICP è salvato in profiles.raw_profile_data.icp_current via merge (non sovrascrive l'analisi profilo).
       // Così refresh pagina / cambio device / nuova sessione → ICP sempre disponibile.
       // Fix B: se data.icp non esiste (schema backend diverso), usa l'intero `data` come ICP.
+      // v3.4.4 fix: mergeRawProfileData legge lo stato fresco dal DB (no stale closure).
       // Phase 2 TODO: migrare su tabella `icps` con history.
       if (skill.id === "icp-builder") {
         const data = (result.data ?? {}) as any;
@@ -1558,9 +1580,8 @@ export default function SkillPage() {
             exclusioni: data.exclusioni ?? null,
             user_input: formValues.description || "",
           };
-          // Salva su DB con merge (preserva l'analisi di auto-profile-setup)
-          const currentRaw = (profile.raw_profile_data || {}) as Record<string, unknown>;
-          await updateRawProfileData({ ...currentRaw, icp_current: icpRecord });
+          // Salva su DB con merge fresco (preserva auto-profile-setup e ogni altra chiave)
+          await mergeRawProfileData({ icp_current: icpRecord });
           // Fallback localStorage (utile se profile non ancora hydrated)
           try {
             localStorage.setItem("ember:last_icp", JSON.stringify(icpRecord));
@@ -1575,7 +1596,7 @@ export default function SkillPage() {
       }
 
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
-    } else if (isEmberErrorResult(result)) {
+    } else {
       const msg = emberErrorMessage(result.error);
       setError(msg);
       toast.error(msg);
@@ -1614,7 +1635,7 @@ export default function SkillPage() {
       section: sectionName,
       stato_attuale: section.stato_attuale || "",
       current_rewrite: section.riscrittura || "",
-      profile_context: toRecord(data.profilo_business) ?? toRecord(profile.business_profile) ?? {},
+      profile_context: (data.profilo_business || profile.business_profile || {}) as Record<string, unknown>,
       user_feedback: feedback || undefined,
     });
 
@@ -1645,7 +1666,7 @@ export default function SkillPage() {
       await consumeSkillRun(false);
 
       toast.success(`${sectionName} rigenerata`);
-    } else if (isEmberErrorResult(result)) {
+    } else {
       await logRun({
         skill: "regenerate-section",
         input: { section: sectionName, feedback: feedback || null },
