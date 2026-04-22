@@ -62,6 +62,9 @@ export type Database = {
           scrapes_daily_limit: number
           scrapes_reset_at: string | null
           scrapes_used_today: number
+          searches_daily_limit: number
+          searches_reset_at: string
+          searches_used_today: number
           skill_runs_limit: number
           skill_runs_reset_at: string | null
           skill_runs_used: number
@@ -71,6 +74,7 @@ export type Database = {
           trial_ends_at: string | null
           updated_at: string
           user_id: string
+          watchlist_max_items: number
         }
         Insert: {
           business_profile?: Json | null
@@ -87,6 +91,9 @@ export type Database = {
           scrapes_daily_limit?: number
           scrapes_reset_at?: string | null
           scrapes_used_today?: number
+          searches_daily_limit?: number
+          searches_reset_at?: string
+          searches_used_today?: number
           skill_runs_limit?: number
           skill_runs_reset_at?: string | null
           skill_runs_used?: number
@@ -96,6 +103,7 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string
           user_id: string
+          watchlist_max_items?: number
         }
         Update: {
           business_profile?: Json | null
@@ -112,6 +120,9 @@ export type Database = {
           scrapes_daily_limit?: number
           scrapes_reset_at?: string | null
           scrapes_used_today?: number
+          searches_daily_limit?: number
+          searches_reset_at?: string
+          searches_used_today?: number
           skill_runs_limit?: number
           skill_runs_reset_at?: string | null
           skill_runs_used?: number
@@ -119,6 +130,109 @@ export type Database = {
           stripe_subscription_id?: string | null
           target_audience?: string | null
           trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+          watchlist_max_items?: number
+        }
+        Relationships: []
+      }
+      prospect_list_items: {
+        Row: {
+          added_at: string
+          list_id: string
+          note: string | null
+          prospect_id: string
+        }
+        Insert: {
+          added_at?: string
+          list_id: string
+          note?: string | null
+          prospect_id: string
+        }
+        Update: {
+          added_at?: string
+          list_id?: string
+          note?: string | null
+          prospect_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "prospect_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospect_list_items_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospect_lists: {
+        Row: {
+          created_at: string
+          description: string | null
+          icp_snapshot: Json | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icp_snapshot?: Json | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icp_snapshot?: Json | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      prospects: {
+        Row: {
+          created_at: string
+          enriched_at: string | null
+          full_data: Json | null
+          id: string
+          linkedin_url: string
+          short_data: Json
+          source_search_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enriched_at?: string | null
+          full_data?: Json | null
+          id?: string
+          linkedin_url: string
+          short_data: Json
+          source_search_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enriched_at?: string | null
+          full_data?: Json | null
+          id?: string
+          linkedin_url?: string
+          short_data?: Json
+          source_search_at?: string
           updated_at?: string
           user_id?: string
         }
@@ -230,8 +344,13 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      consume_search_quota: { Args: { p_user_id: string }; Returns: Json }
       reset_daily_scrapes: { Args: never; Returns: undefined }
       reset_scrape_quota_if_due: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      reset_searches_quota_if_due: {
         Args: { p_user_id: string }
         Returns: undefined
       }
