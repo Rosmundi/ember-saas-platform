@@ -1,18 +1,25 @@
 // ============================================================================
 // Edge Function: check-search-quota
 // ============================================================================
-// Endpoint chiamato da n8n PRIMA di lanciare Apify, per verificare se l'utente
-// ha quota disponibile.
+// Endpoint Lovable Cloud chiamato da n8n PRIMA di lanciare Apify, per verificare
+// se l'utente ha quota disponibile per fare una nuova search.
 //
-// Auth: header X-Ember-Key (deve matchare EMBER_SHARED_KEY su Lovable Secrets).
+// Auth: header X-Ember-Key (deve matchare EMBER_INTERNAL_KEY su Lovable Secrets).
 //
-// Input (JSON body): { "user_id": "<uuid>" }
+// Input (JSON body):
+//   { "user_id": "<uuid>" }
 //
 // Output success (200):
 //   { "ok": true, "data": { "used": 3, "limit": 20, "remaining": 17, "reset_at": "..." } }
 //
 // Output quota piena (200, ok=false):
-//   { "ok": false, "code": "QUOTA_EXCEEDED", "data": {...stesso shape...} }
+//   { "ok": false, "code": "QUOTA_EXCEEDED", "data": {...stesso shape sopra...} }
+//   (n8n traduce in HTTP 429 al frontend)
+//
+// Output errori auth/input:
+//   401 { "ok": false, "code": "UNAUTHORIZED" }
+//   400 { "ok": false, "code": "BAD_REQUEST", "message": "..." }
+//   500 { "ok": false, "code": "INTERNAL", "message": "..." }
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -32,20 +39,24 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 serve(async (req: Request) => {
+  // Preflight CORS
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
+
   if (req.method !== "POST") {
     return jsonResponse({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405);
   }
 
-  // 1. Auth guard.
-  const sharedKey = Deno.env.get("EMBER_SHARED_KEY");
-  if (!sharedKey) {
-    console.error("[check-search-quota] EMBER_SHARED_KEY non configurata");
-    return jsonResponse({ ok: false, code: "INTERNAL", message: "Missing EMBER_SHARED_KEY" }, 500);
+  // 1. Verifica X-Ember-Key (stessa convenzione di n8n guard).
+  //    Nome canonico: EMBER_INTERNAL_KEY (server-to-server, non è "shared" col frontend).
+  const internalKey = Deno.env.get("EMBER_INTERNAL_KEY");
+  if (!internalKey) {
+    console.error("[check-search-quota] EMBER_INTERNAL_KEY non configurata su Lovable Secrets");
+    return jsonResponse({ ok: false, code: "INTERNAL", message: "Missing EMBER_INTERNAL_KEY" }, 500);
   }
-  if (req.headers.get("x-ember-key") !== sharedKey) {
+  const requestKey = req.headers.get("x-ember-key");
+  if (requestKey !== internalKey) {
     return jsonResponse({ ok: false, code: "UNAUTHORIZED" }, 401);
   }
 
@@ -61,10 +72,11 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: false, code: "BAD_REQUEST", message: "user_id mancante o non valido" }, 400);
   }
 
-  // 3. Supabase client (service_role auto-iniettato da Lovable Cloud).
+  // 3. Supabase client con service_role (bypass RLS — siamo lato server fidato).
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) {
+    console.error("[check-search-quota] SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY mancanti (dovrebbero essere auto-iniettate da Lovable)");
     return jsonResponse({ ok: false, code: "INTERNAL", message: "Supabase env vars mancanti" }, 500);
   }
   const supabase = createClient(supabaseUrl, serviceKey, {
@@ -72,14 +84,14 @@ serve(async (req: Request) => {
   });
 
   try {
-    // 4. Riaccredita quota se finestra giornaliera scaduta.
+    // 4. Riaccredita la quota se la finestra giornaliera è scaduta.
     const { error: resetErr } = await supabase.rpc("reset_searches_quota_if_due", { p_user_id: userId });
     if (resetErr) {
       console.error("[check-search-quota] reset RPC error:", resetErr);
       return jsonResponse({ ok: false, code: "INTERNAL", message: resetErr.message }, 500);
     }
 
-    // 5. Leggi stato fresco.
+    // 5. Leggi lo stato fresco.
     const { data, error: selErr } = await supabase
       .from("profiles")
       .select("searches_used_today, searches_daily_limit, searches_reset_at")
@@ -87,6 +99,7 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (selErr) {
+      console.error("[check-search-quota] select error:", selErr);
       return jsonResponse({ ok: false, code: "INTERNAL", message: selErr.message }, 500);
     }
     if (!data) {
@@ -96,8 +109,14 @@ serve(async (req: Request) => {
     const used = Number(data.searches_used_today ?? 0);
     const limit = Number(data.searches_daily_limit ?? 0);
     const remaining = Math.max(limit - used, 0);
-    const quotaInfo = { used, limit, remaining, reset_at: data.searches_reset_at };
+    const quotaInfo = {
+      used,
+      limit,
+      remaining,
+      reset_at: data.searches_reset_at,
+    };
 
+    // 6. Risposta: ok=true se sotto al limite, ok=false con code QUOTA_EXCEEDED altrimenti.
     if (used < limit) {
       return jsonResponse({ ok: true, data: quotaInfo });
     } else {
