@@ -10,7 +10,7 @@ const N8N_BASE = import.meta.env.VITE_N8N_BASE_URL || "https://n8n.archetipo.inf
 // viene mandato come header X-Ember-Key su TUTTE le chiamate webhook.
 // Lato n8n, un If-node deve rifiutare con 401 se l'header non matcha.
 // Se la env var non è settata, l'header viene omesso → nessuna regressione.
-const EMBER_KEY = import.meta.env.VITE_EMBER_KEY || "";
+const EMBER_KEY = "6dd4fdc3060284740a48f25911ba3c4943950a3dc385d1a160e82240b3aa38a7";
 
 export interface EmberResponse<T = Record<string, unknown>> {
   success: boolean;
