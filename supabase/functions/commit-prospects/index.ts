@@ -1,16 +1,45 @@
 // ============================================================================
 // Edge Function: commit-prospects
 // ============================================================================
-// Endpoint chiamato da n8n DOPO che Apify ha restituito i profili.
+// Endpoint Lovable Cloud chiamato da n8n DOPO che Apify ha restituito i profili.
 // Fa 2 cose atomiche (in quest'ordine):
-//   1. UPSERT dei prospects in `prospects` (dedup user_id+linkedin_url)
+//   1. UPSERT dei prospects in `prospects` (dedup per user_id+linkedin_url)
 //   2. Chiama RPC consume_search_quota(user_id) per incrementare la quota
 //
 // Trade-off: se consume_search_quota fallisce per QUOTA_EXCEEDED (race tra 2 tab),
 // i prospects sono GIÀ stati salvati. L'utente se li trova in lista ma riceve un
-// warning quota. Accettabile per MVP.
+// warning quota. Accettabile per MVP — alternativa è transaction plpgsql custom.
 //
 // Auth: header X-Ember-Key (stessa di check-search-quota).
+//
+// Input (JSON body):
+//   {
+//     "user_id": "<uuid>",
+//     "prospects": [
+//       {
+//         "linkedin_url": "https://...",
+//         "short_data": { ... },
+//         "source_search_at": "2026-04-22T10:00:00.000Z"  // opzionale, default now()
+//       },
+//       ...
+//     ]
+//   }
+//
+// Output success (200):
+//   {
+//     "ok": true,
+//     "data": {
+//       "prospects_saved": [{id, linkedin_url, ...}, ...],
+//       "count": 25,
+//       "quota": { "used": 4, "limit": 20, "remaining": 16, "reset_at": "..." }
+//     }
+//   }
+//
+// Output errori:
+//   401 UNAUTHORIZED
+//   400 BAD_REQUEST
+//   409 QUOTA_EXCEEDED (prospects comunque salvati — vedi trade-off)
+//   500 INTERNAL
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -44,11 +73,13 @@ serve(async (req: Request) => {
   }
 
   // 1. Auth guard.
-  const sharedKey = Deno.env.get("EMBER_SHARED_KEY");
-  if (!sharedKey) {
-    return jsonResponse({ ok: false, code: "INTERNAL", message: "Missing EMBER_SHARED_KEY" }, 500);
+  //    Nome canonico: EMBER_INTERNAL_KEY (server-to-server, non è "shared" col frontend).
+  const internalKey = Deno.env.get("EMBER_INTERNAL_KEY");
+  if (!internalKey) {
+    console.error("[commit-prospects] EMBER_INTERNAL_KEY non configurata su Lovable Secrets");
+    return jsonResponse({ ok: false, code: "INTERNAL", message: "Missing EMBER_INTERNAL_KEY" }, 500);
   }
-  if (req.headers.get("x-ember-key") !== sharedKey) {
+  if (req.headers.get("x-ember-key") !== internalKey) {
     return jsonResponse({ ok: false, code: "UNAUTHORIZED" }, 401);
   }
 
@@ -69,7 +100,7 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: false, code: "BAD_REQUEST", message: "prospects deve essere array" }, 400);
   }
 
-  // Sanitize + filter.
+  // Sanitize + filter: scarta righe senza linkedin_url.
   const now = new Date().toISOString();
   const rows = prospectsIn
     .filter((p) => p && typeof p.linkedin_url === "string" && p.linkedin_url.length > 0)
@@ -80,7 +111,7 @@ serve(async (req: Request) => {
       source_search_at: typeof p.source_search_at === "string" ? p.source_search_at : now,
     }));
 
-  // Edge case: array vuoto — non consumare quota.
+  // Edge case: array vuoto (Apify non ha trovato nulla) — non consumare quota.
   if (rows.length === 0) {
     return jsonResponse({
       ok: true,
@@ -93,10 +124,11 @@ serve(async (req: Request) => {
     });
   }
 
-  // 3. Supabase client (service_role auto-iniettato).
+  // 3. Supabase client.
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) {
+    console.error("[commit-prospects] SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY mancanti");
     return jsonResponse({ ok: false, code: "INTERNAL", message: "Supabase env vars mancanti" }, 500);
   }
   const supabase = createClient(supabaseUrl, serviceKey, {
@@ -104,7 +136,7 @@ serve(async (req: Request) => {
   });
 
   try {
-    // 4. UPSERT prospects (dedup user_id+linkedin_url enforced dal UNIQUE index).
+    // 4. UPSERT prospects (dedup user_id+linkedin_url già enforced dal UNIQUE index).
     const { data: saved, error: upsertErr } = await supabase
       .from("prospects")
       .upsert(rows, { onConflict: "user_id,linkedin_url", ignoreDuplicates: false })
@@ -115,14 +147,16 @@ serve(async (req: Request) => {
       return jsonResponse({ ok: false, code: "INTERNAL", message: upsertErr.message }, 500);
     }
 
-    // 5. Consume quota atomicamente via RPC.
+    // 5. Consume quota atomicamente via RPC. Se solleva quota_exceeded → 409.
     const { data: quotaData, error: quotaErr } = await supabase.rpc("consume_search_quota", {
       p_user_id: userId,
     });
 
     if (quotaErr) {
+      // Distingui quota_exceeded (P0001) da altri errori.
       const msg = String(quotaErr.message || "");
       if (msg.includes("quota_exceeded")) {
+        console.warn("[commit-prospects] quota exceeded after upsert — race condition", userId);
         return jsonResponse(
           {
             ok: false,
