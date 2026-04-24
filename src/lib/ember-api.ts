@@ -124,7 +124,6 @@ async function invokeGateway<T = Record<string, unknown>>(
       EmberResponse<T> & { ok?: boolean; code?: string; message?: string }
     >("run-skill", {
       body: { skillId, payload },
-      // @ts-expect-error signal è supportato runtime ma non sempre nei tipi
       signal: controller.signal,
     });
 
