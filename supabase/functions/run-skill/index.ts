@@ -50,8 +50,16 @@ const CORS_HEADERS = {
 const ALLOWED_SKILLS = new Set<string>([
   "auto-profile-setup",
   "regenerate-section",
+  // prospect-finder = workflow live attuale (scrape 1 URL + fit_score vs ICP)
+  "prospect-finder",
+  // icp-builder = costruzione ICP/buyer personas (usato dal form Dashboard)
+  "icp-builder",
+  // outreach-drafter = scrivi messaggio di primo contatto per un prospect
+  "outreach-drafter",
+  // prospect-search-harvest = workflow evolutivo (search massiva ICP→lista). Da importare su n8n quando attivo.
   "prospect-search-harvest",
-  // aggiungere: "content-calendar", "weekly-digest", ecc.
+  // aggiungere in futuro: profile-optimizer, post-writer, visual-post-builder,
+  // content-performance, reply-suggester, network-intelligence
 ]);
 
 // Timeout upstream n8n. Tenere < wall-time Edge Function (Lovable Pro = 400s).
