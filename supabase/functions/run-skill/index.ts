@@ -1,8 +1,16 @@
 // ============================================================================
-// Edge Function: run-skill (Gateway v3.6.0)
+// Edge Function: run-skill (Gateway v3.6.1)
 // ============================================================================
 // Gateway server-side per tutte le skill Ember. Sostituisce la chiamata diretta
 // browser→n8n. Chiuso il leak di VITE_EMBER_KEY dal bundle pubblico.
+//
+// v3.6.1 (post-response commit per prospect-search-harvest):
+//   - Il workflow n8n harvest è stato semplificato (no più quota, no più upsert).
+//     Restituisce solo prospects normalizzati. run-skill ora si occupa di:
+//       (a) pre-check quota PRIMA di chiamare n8n (come v3.6.0)
+//       (b) post-response: se skillId='prospect-search-harvest' e prospects.length>0,
+//           chiama commit-prospects (atomico: upsert + consume_search_quota).
+//   - Tutto su Lovable+Supabase, n8n resta "stupido": entra ICP, esce lista.
 //
 // v3.6.0 (refactor quota Ember):
 //   - Pre-check quota "searches" lato Lovable PRIMA di chiamare n8n, per le
@@ -10,9 +18,6 @@
 //   - Se l'utente è a 0 search rimanenti, il webhook n8n NON parte: ritorniamo
 //     429 QUOTA_EXCEEDED direttamente al client con reset_at.
 //   - Nessun cambio per le altre skill (auto-profile-setup, icp-builder, ecc.).
-//   - Nota: il workflow n8n mantiene il proprio check-search-quota come
-//     defense-in-depth (no-op sul happy path di run-skill, ma protegge se
-//     qualcuno riesce a chiamare il webhook con X-Ember-Key valida).
 //
 // Chiamante: Frontend via supabase.functions.invoke('run-skill', { ... })
 //
@@ -234,6 +239,57 @@ serve(async (req: Request) => {
     // Proxy body + status. Content-Type forzato a JSON (n8n Respond to Webhook
     // JSON ritorna sempre application/json; se fosse altro, è un bug upstream).
     const text = await upstream.text();
+
+    // v3.6.1: post-response commit per prospect-search-harvest.
+    // Il workflow n8n semplificato non fa più upsert né consumo quota.
+    // Qui chiamiamo commit-prospects (atomico: upsert prospects + consume_search_quota).
+    // Se commit fallisce, NON facciamo crashare la response al client: logghiamo e
+    // restituiamo i prospects (l'utente li ha visti). La quota resta non consumata
+    // → al prossimo retry l'utente non perde una "search" gratis. Trade-off accettabile
+    // per MVP: meglio under-charge che lasciare l'utente senza output.
+    if (skillId === "prospect-search-harvest" && upstream.status === 200) {
+      try {
+        const parsed = JSON.parse(text);
+        const prospects = parsed?.data?.prospects;
+        if (Array.isArray(prospects) && prospects.length > 0 && serviceKey) {
+          const commitUrl = `${supabaseUrl}/functions/v1/commit-prospects`;
+          const commitResp = await fetch(commitUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+              apikey: serviceKey,
+              "x-ember-key": internalKey,
+            },
+            body: JSON.stringify({ user_id: userId, prospects }),
+          });
+          if (!commitResp.ok) {
+            const commitErr = await commitResp.text();
+            console.error(`[run-skill] commit-prospects failed (${commitResp.status}):`, commitErr.slice(0, 300));
+            // Continuiamo: il client riceve i prospects comunque. Quota NON consumata.
+          } else {
+            // Inietta info quota aggiornata nella response al client (ottimizzazione UX).
+            try {
+              const commitJson = await commitResp.json();
+              parsed.data.count_saved = commitJson?.data?.count ?? prospects.length;
+              parsed.quota_consumed = {
+                searches: 1,
+                remaining_today: commitJson?.data?.quota?.remaining ?? null,
+              };
+              return new Response(JSON.stringify(parsed), {
+                status: 200,
+                headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+              });
+            } catch {
+              // commitResp non era JSON parseable — proseguiamo con la response originale n8n.
+            }
+          }
+        }
+      } catch (parseErr) {
+        console.warn("[run-skill] post-response parse failed (non-fatal):", parseErr);
+      }
+    }
+
     return new Response(text, {
       status: upstream.status,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
