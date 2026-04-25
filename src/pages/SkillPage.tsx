@@ -1503,18 +1503,52 @@ export default function SkillPage() {
     setError(null);
     setLoadedFromCache(false);
 
-    const payload = buildPayload(
+    // v3.6.0 routing: la pagina è SEMPRE /skill/prospect-finder, ma:
+    //   - se l'utente ha incollato un URL → workflow "prospect-finder" (scrape singolo + fit_score)
+    //   - se l'utente ha SOLO ICP/testo → workflow "prospect-search-harvest" (search massiva → 25 prospects)
+    // Usiamo l'ICP strutturato salvato da icp-builder (raw_profile_data.icp_current) se presente,
+    // altrimenti fallback su {descrizione: testo libero}.
+    let effectiveSkillId: string = skill.id;
+    let payload = buildPayload(
       skill.id,
       formValues,
       profile.business_profile as unknown as Record<string, unknown> | null,
       user.id,
     );
-    const result = await callSkill(skill.id, payload);
+
+    if (skill.id === "prospect-finder") {
+      const hasUrl = !!(formValues.url && formValues.url.trim().length > 0);
+      if (!hasUrl) {
+        effectiveSkillId = "prospect-search-harvest";
+        const icpCurrent = (profile.raw_profile_data as any)?.icp_current;
+        const icpStrutturato = icpCurrent?.icp ?? null;
+        const icpPayload =
+          icpStrutturato && typeof icpStrutturato === "object"
+            ? icpStrutturato
+            : formValues.query
+              ? { descrizione: formValues.query }
+              : {};
+        if (!icpPayload || Object.keys(icpPayload).length === 0) {
+          toast.error("Inserisci un URL LinkedIn oppure costruisci prima l'ICP dalla Dashboard.");
+          setLoading(false);
+          return;
+        }
+        payload = {
+          user_id: user.id,
+          icp: icpPayload,
+          list_name: "",
+        };
+      }
+    }
+
+    // SkillId è una union literal stretta in ember-types; cast esplicito perché
+    // 'prospect-search-harvest' è già whitelisted lato gateway run-skill.
+    const result = await callSkill(effectiveSkillId as any, payload);
 
     if (result.ok) {
       setOutput(result.data as Record<string, unknown>);
       await logRun({
-        skill: skill.id,
+        skill: effectiveSkillId,
         input: payload,
         output: result.data as Record<string, unknown>,
         status: "completed",
@@ -1605,7 +1639,7 @@ export default function SkillPage() {
       setError(msg);
       toast.error(msg);
       await logRun({
-        skill: skill.id,
+        skill: effectiveSkillId,
         input: payload,
         output: null,
         status: "error",
