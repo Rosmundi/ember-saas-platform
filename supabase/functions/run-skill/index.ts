@@ -1,8 +1,18 @@
 // ============================================================================
-// Edge Function: run-skill (Gateway v3.5.0)
+// Edge Function: run-skill (Gateway v3.6.0)
 // ============================================================================
 // Gateway server-side per tutte le skill Ember. Sostituisce la chiamata diretta
 // browser→n8n. Chiuso il leak di VITE_EMBER_KEY dal bundle pubblico.
+//
+// v3.6.0 (refactor quota Ember):
+//   - Pre-check quota "searches" lato Lovable PRIMA di chiamare n8n, per le
+//     skill che consumano searches_* (prospect-search-harvest, prospect-finder).
+//   - Se l'utente è a 0 search rimanenti, il webhook n8n NON parte: ritorniamo
+//     429 QUOTA_EXCEEDED direttamente al client con reset_at.
+//   - Nessun cambio per le altre skill (auto-profile-setup, icp-builder, ecc.).
+//   - Nota: il workflow n8n mantiene il proprio check-search-quota come
+//     defense-in-depth (no-op sul happy path di run-skill, ma protegge se
+//     qualcuno riesce a chiamare il webhook con X-Ember-Key valida).
 //
 // Chiamante: Frontend via supabase.functions.invoke('run-skill', { ... })
 //
@@ -25,15 +35,18 @@
 //   401 { ok: false, code: "UNAUTHORIZED" }          // JWT mancante/invalida
 //   400 { ok: false, code: "BAD_REQUEST", message }  // body malformato
 //   403 { ok: false, code: "FORBIDDEN_SKILL" }       // skillId non in whitelist
+//   429 { ok: false, code: "QUOTA_EXCEEDED", data:{used, limit, remaining, reset_at} }
+//   404 { ok: false, code: "PROFILE_NOT_FOUND" }     // profilo mancante (edge case)
 //   502 { ok: false, code: "UPSTREAM_ERROR" }        // n8n unreachable
 //   504 { ok: false, code: "UPSTREAM_TIMEOUT" }      // n8n > SKILL_TIMEOUT_MS
 //   500 { ok: false, code: "INTERNAL", message }     // config mancante / bug
 //
 // Env vars richieste (Lovable Secrets):
-//   EMBER_INTERNAL_KEY   = shared secret n8n (stessa dell'If-guard n8n)
-//   N8N_BASE_URL         = https://n8n.archetipo.info/webhook  (opzionale, default)
-//   SUPABASE_URL         = auto-iniettata
-//   SUPABASE_ANON_KEY    = auto-iniettata (serve per verificare JWT)
+//   EMBER_INTERNAL_KEY         = shared secret n8n (stessa dell'If-guard n8n)
+//   N8N_BASE_URL               = https://n8n.archetipo.info/webhook  (opzionale, default)
+//   SUPABASE_URL               = auto-iniettata
+//   SUPABASE_ANON_KEY          = auto-iniettata (per verificare JWT)
+//   SUPABASE_SERVICE_ROLE_KEY  = auto-iniettata (per RPC reset + SELECT quota bypass RLS)
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -56,11 +69,15 @@ const ALLOWED_SKILLS = new Set<string>([
   "icp-builder",
   // outreach-drafter = scrivi messaggio di primo contatto per un prospect
   "outreach-drafter",
-  // prospect-search-harvest = workflow evolutivo (search massiva ICP→lista). Da importare su n8n quando attivo.
+  // prospect-search-harvest = workflow evolutivo (search massiva ICP→lista)
   "prospect-search-harvest",
   // aggiungere in futuro: profile-optimizer, post-writer, visual-post-builder,
   // content-performance, reply-suggester, network-intelligence
 ]);
+
+// Skill che consumano 1 "search" (quota giornaliera searches_daily_limit).
+// Pre-check forzato PRIMA di forwardare a n8n.
+const SEARCH_CONSUMING_SKILLS = new Set<string>(["prospect-search-harvest", "prospect-finder"]);
 
 // Timeout upstream n8n. Tenere < wall-time Edge Function (Lovable Pro = 400s).
 // Tenere >= timeout client (ember-api.ts callSkill = 300s) così è sempre
@@ -92,6 +109,7 @@ serve(async (req: Request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !anonKey) {
     console.error("[run-skill] SUPABASE_URL/SUPABASE_ANON_KEY mancanti");
     return jsonResponse({ ok: false, code: "INTERNAL", message: "Supabase env vars mancanti" }, 500);
@@ -99,9 +117,7 @@ serve(async (req: Request) => {
 
   // 2. Verifica JWT. Prendiamo l'Authorization header as-is, passiamo a supabase.auth.getUser.
   const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.toLowerCase().startsWith("bearer ")
-    ? authHeader.slice(7).trim()
-    : "";
+  const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
   if (!token) {
     return jsonResponse({ ok: false, code: "UNAUTHORIZED", message: "Missing bearer token" }, 401);
   }
@@ -138,10 +154,67 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: false, code: "FORBIDDEN_SKILL", message: `Skill ${skillId} non consentita` }, 403);
   }
 
-  // 4. Inietta user_id autoritativo dal JWT. Sovrascrive qualsiasi valore client.
+  // 4. Pre-check quota "searches" per skill che la consumano.
+  //    Facciamo reset-se-scaduta + SELECT fresca. Se esaurita → 429 immediato.
+  //    Serve service_role per bypassare RLS (stesso pattern di check-search-quota).
+  if (SEARCH_CONSUMING_SKILLS.has(skillId)) {
+    if (!serviceKey) {
+      console.error("[run-skill] SUPABASE_SERVICE_ROLE_KEY mancante — impossibile pre-checkare quota");
+      return jsonResponse({ ok: false, code: "INTERNAL", message: "Service role key mancante" }, 500);
+    }
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // 4a. Reset se la finestra giornaliera è passata.
+    const { error: resetErr } = await adminClient.rpc("reset_searches_quota_if_due", {
+      p_user_id: userId,
+    });
+    if (resetErr) {
+      console.error("[run-skill] reset_searches_quota_if_due error:", resetErr);
+      return jsonResponse({ ok: false, code: "INTERNAL", message: resetErr.message }, 500);
+    }
+
+    // 4b. Leggi lo stato fresco.
+    const { data: quotaRow, error: selErr } = await adminClient
+      .from("profiles")
+      .select("searches_used_today, searches_daily_limit, searches_reset_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (selErr) {
+      console.error("[run-skill] select quota error:", selErr);
+      return jsonResponse({ ok: false, code: "INTERNAL", message: selErr.message }, 500);
+    }
+    if (!quotaRow) {
+      return jsonResponse({ ok: false, code: "PROFILE_NOT_FOUND", message: "Profilo non trovato" }, 404);
+    }
+
+    const used = Number(quotaRow.searches_used_today ?? 0);
+    const limit = Number(quotaRow.searches_daily_limit ?? 0);
+    const remaining = Math.max(limit - used, 0);
+    const resetAt = quotaRow.searches_reset_at;
+
+    if (used >= limit) {
+      // Niente webhook — utente informato subito.
+      console.info(`[run-skill] QUOTA_EXCEEDED pre-check ${skillId} user=${userId} used=${used}/${limit}`);
+      return jsonResponse(
+        {
+          ok: false,
+          code: "QUOTA_EXCEEDED",
+          message: "Hai esaurito le search di oggi. Torna domani o passa a un piano superiore.",
+          data: { used, limit, remaining: 0, reset_at: resetAt },
+        },
+        429,
+      );
+    }
+    // altrimenti proseguiamo al forward.
+  }
+
+  // 5. Inietta user_id autoritativo dal JWT. Sovrascrive qualsiasi valore client.
   const forwardBody = { ...payload, user_id: userId };
 
-  // 5. Forward a n8n con X-Ember-Key + AbortController timeout.
+  // 6. Forward a n8n con X-Ember-Key + AbortController timeout.
   const targetUrl = `${n8nBase}/ember/${skillId}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SKILL_TIMEOUT_MS);
@@ -170,7 +243,14 @@ serve(async (req: Request) => {
     const isAbort = err instanceof DOMException && err.name === "AbortError";
     if (isAbort) {
       console.error(`[run-skill] Timeout n8n su ${skillId} (user ${userId})`);
-      return jsonResponse({ ok: false, code: "UPSTREAM_TIMEOUT", message: `n8n non ha risposto entro ${Math.round(SKILL_TIMEOUT_MS / 1000)}s` }, 504);
+      return jsonResponse(
+        {
+          ok: false,
+          code: "UPSTREAM_TIMEOUT",
+          message: `n8n non ha risposto entro ${Math.round(SKILL_TIMEOUT_MS / 1000)}s`,
+        },
+        504,
+      );
     }
     console.error(`[run-skill] Errore upstream n8n:`, err);
     return jsonResponse({ ok: false, code: "UPSTREAM_ERROR", message: String(err) }, 502);
