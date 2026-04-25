@@ -1,22 +1,20 @@
 // src/lib/ember-api.ts
 // ============================================================================
-// v3.5.0 — Gateway mode
+// v3.6.0 — Gateway mode + pre-check quota searches
 // ============================================================================
 // Il client NON chiama più direttamente i webhook n8n. Passa dalla Edge Function
 // `run-skill` (vedi lovable_update/edge_functions/run-skill/index.ts), che:
 //   - verifica la JWT Supabase dell'utente
 //   - estrae user_id autoritativo dal claim `sub` (non più spoofabile dal client)
 //   - applica whitelist sulle skill consentite
+//   - pre-checka quota "searches" per prospect-search-harvest e prospect-finder
+//     → se esaurita, 429 QUOTA_EXCEEDED SENZA chiamare n8n (v3.6.0)
 //   - aggiunge il server-to-server X-Ember-Key (EMBER_INTERNAL_KEY) lato server
 //   - forwarda al webhook n8n e proxa la risposta
 //
 // Conseguenza: VITE_EMBER_KEY è RIMOSSA dal bundle pubblico. Chi ispeziona il JS
 // non trova più la shared secret. L'unica via per colpire n8n resta via gateway,
 // e il gateway richiede JWT valida.
-//
-// Breaking change rispetto a v3.4.x: serve che l'utente sia loggato (sessione
-// Supabase attiva). Per le chiamate non-post-login (nessuna al momento in Ember)
-// bisognerà prevedere un endpoint separato, out of scope qui.
 // ============================================================================
 
 import type { SkillId } from "@/lib/ember-types";
@@ -38,9 +36,17 @@ export interface EmberError {
     | "parse_error"
     | "unauthorized"
     | "forbidden_skill"
-    | "upstream_timeout";
+    | "upstream_timeout"
+    | "profile_not_found";
   message: string;
   detail?: string;
+  // v3.6.0: per quota_exceeded, il gateway include i dettagli {used, limit, remaining, reset_at}
+  quota?: {
+    used: number;
+    limit: number;
+    remaining: number;
+    reset_at: string | null;
+  };
 }
 
 export type EmberResult<T = Record<string, unknown>> =
@@ -124,6 +130,7 @@ async function invokeGateway<T = Record<string, unknown>>(
       EmberResponse<T> & { ok?: boolean; code?: string; message?: string }
     >("run-skill", {
       body: { skillId, payload },
+      // @ts-expect-error signal è supportato runtime ma non sempre nei tipi
       signal: controller.signal,
     });
 
@@ -132,8 +139,16 @@ async function invokeGateway<T = Record<string, unknown>>(
 
     if (error) {
       // supabase.functions.invoke wraps non-2xx in error. Proviamo a leggere il
-      // body dell'errore, che il gateway serializza come { ok:false, code, message }.
-      const detail = (error.context as any)?.body || error.message;
+      // body dell'errore, che il gateway serializza come { ok:false, code, message, data? }.
+      // v3.6.0: parse JSON string se il body arriva stringificato (dipende dalla versione supabase-js).
+      let detail: any = (error.context as any)?.body || error.message;
+      if (typeof detail === "string") {
+        try {
+          detail = JSON.parse(detail);
+        } catch {
+          /* lascia stringa */
+        }
+      }
       const maybeCode = typeof detail === "object" ? detail?.code : undefined;
 
       if (maybeCode === "UNAUTHORIZED") {
@@ -144,6 +159,29 @@ async function invokeGateway<T = Record<string, unknown>>(
       }
       if (maybeCode === "UPSTREAM_TIMEOUT") {
         return { ok: false, error: { code: "upstream_timeout", message: `n8n non ha risposto in tempo.` } };
+      }
+      // v3.6.0: pre-check quota bloccante lato gateway (prospect-search-harvest / prospect-finder).
+      if (maybeCode === "QUOTA_EXCEEDED") {
+        const q = detail?.data || {};
+        return {
+          ok: false,
+          error: {
+            code: "quota_exceeded",
+            message: detail?.message || "Hai esaurito le search di oggi. Torna domani o passa a un piano superiore.",
+            quota: {
+              used: Number(q.used ?? 0),
+              limit: Number(q.limit ?? 0),
+              remaining: Number(q.remaining ?? 0),
+              reset_at: q.reset_at ?? null,
+            },
+          },
+        };
+      }
+      if (maybeCode === "PROFILE_NOT_FOUND") {
+        return {
+          ok: false,
+          error: { code: "profile_not_found", message: "Profilo utente non trovato. Ricarica la pagina." },
+        };
       }
       return {
         ok: false,
@@ -193,8 +231,16 @@ async function invokeGateway<T = Record<string, unknown>>(
 /** Helper UX: messaggio leggibile dall'errore */
 export function emberErrorMessage(err: EmberError): string {
   switch (err.code) {
-    case "quota_exceeded":
-      return "Hai raggiunto il limite. Riprova domani o passa a un piano superiore.";
+    case "quota_exceeded": {
+      // v3.6.0: se abbiamo il dettaglio quota, mostriamo un messaggio contestuale.
+      if (err.quota) {
+        const resetHint = err.quota.reset_at
+          ? ` Riprova dopo ${new Date(err.quota.reset_at).toLocaleString("it-IT", { hour: "2-digit", minute: "2-digit" })}.`
+          : " Riprova domani.";
+        return `Hai usato ${err.quota.used}/${err.quota.limit} search di oggi.${resetHint}`;
+      }
+      return err.message || "Hai raggiunto il limite. Riprova domani o passa a un piano superiore.";
+    }
     case "invalid_input":
       return err.detail || "Input non valido.";
     case "n8n_error":
@@ -209,6 +255,8 @@ export function emberErrorMessage(err: EmberError): string {
       return err.message;
     case "upstream_timeout":
       return "Il servizio ha impiegato troppo tempo. Riprova con un profilo meno denso o contatta il supporto.";
+    case "profile_not_found":
+      return err.message;
     default:
       return "Errore sconosciuto.";
   }
