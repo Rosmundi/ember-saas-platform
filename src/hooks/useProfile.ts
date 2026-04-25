@@ -27,6 +27,12 @@ interface ProfileRow {
   scrapes_used_today: number;
   scrapes_daily_limit: number;
   scrapes_reset_at: string | null;
+  // v3.6.0: quota giornaliera "searches" (prospect-search-harvest / prospect-finder).
+  // Colonne aggiunte dalla migration 006_searches_quota_and_watchlist.sql.
+  searches_used_today: number;
+  searches_daily_limit: number;
+  searches_reset_at: string | null;
+  watchlist_max_items: number;
   trial_ends_at: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
@@ -45,6 +51,12 @@ function rowToProfile(row: ProfileRow): Profile {
     skill_runs_limit: row.skill_runs_limit ?? 20,
     scrapes_used_today: row.scrapes_used_today ?? 0,
     scrapes_daily_limit: row.scrapes_daily_limit ?? 0,
+    // v3.6.0: quota searches (per prospect finder). Prerequisite: ember-types.ts Profile
+    // va esteso con gli stessi campi (vedi PROMPT_LOVABLE.md).
+    searches_used_today: row.searches_used_today ?? 0,
+    searches_daily_limit: row.searches_daily_limit ?? 0,
+    searches_reset_at: row.searches_reset_at || null,
+    watchlist_max_items: row.watchlist_max_items ?? 0,
     trial_ends_at: row.trial_ends_at || "",
     created_at: row.created_at,
   };
@@ -70,10 +82,12 @@ export function useProfile() {
     setLoading(true);
     setError(null);
 
-    // Tenta il riaccredito di entrambe le quote in parallelo (failsafe se una fallisce).
-    const [scrapeReset, skillRunsReset] = await Promise.all([
+    // Tenta il riaccredito di TUTTE le quote in parallelo (failsafe se una fallisce).
+    // v3.6.0: aggiunto reset_searches_quota_if_due (quota giornaliera prospect finder).
+    const [scrapeReset, skillRunsReset, searchesReset] = await Promise.all([
       supabase.rpc("reset_scrape_quota_if_due", { p_user_id: user.id }),
       supabase.rpc("reset_skill_runs_if_due", { p_user_id: user.id }),
+      supabase.rpc("reset_searches_quota_if_due", { p_user_id: user.id }),
     ]);
     if (scrapeReset.error) {
       // eslint-disable-next-line no-console
@@ -82,6 +96,10 @@ export function useProfile() {
     if (skillRunsReset.error) {
       // eslint-disable-next-line no-console
       console.warn("[useProfile] reset_skill_runs_if_due failed:", skillRunsReset.error.message);
+    }
+    if (searchesReset.error) {
+      // eslint-disable-next-line no-console
+      console.warn("[useProfile] reset_searches_quota_if_due failed:", searchesReset.error.message);
     }
 
     const { data, error: err } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
