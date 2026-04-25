@@ -199,8 +199,11 @@ async function invokeGateway<T = Record<string, unknown>>(
       };
     }
 
-    const json = data as EmberResponse<T>;
-    if (!json.success || !json.data) {
+    // v3.6.1: accetta sia { success: true, ... } (legacy) sia { ok: true, ... } (workflow semplificati post-v3.6).
+    // I workflow harvest/finder semplificati (no più quota nodes su n8n) ritornano { ok: true, data, skill }.
+    const json = data as EmberResponse<T> & { ok?: boolean };
+    const isSuccess = json.success === true || json.ok === true;
+    if (!isSuccess || !json.data) {
       return {
         ok: false,
         error: {
@@ -210,7 +213,7 @@ async function invokeGateway<T = Record<string, unknown>>(
         },
       };
     }
-    return { ok: true, data: json.data, skill: json.skill, duration_ms };
+    return { ok: true, data: json.data, skill: json.skill || skillId, duration_ms };
   } catch (err: unknown) {
     clearTimeout(timeout);
     const message = err instanceof Error ? err.message : String(err);
