@@ -1764,8 +1764,10 @@ export default function SkillPage() {
 
   const scrapingRemaining = profile ? profile.scrapes_daily_limit - profile.scrapes_used_today : 0;
   // v3.6.1: per prospect-finder/harvest il counter giusto è "searches", non "scrapes".
+  // Nota: la pagina è sempre /skill/prospect-finder; harvest è un dirottamento RUNTIME,
+  // quindi qui basta matchare 'prospect-finder' (skill.id type union non ha 'harvest').
   const searchesRemaining = profile ? Math.max(profile.searches_daily_limit - profile.searches_used_today, 0) : 0;
-  const isProspectSearchSkill = skill?.id === "prospect-finder" || skill?.id === "prospect-search-harvest";
+  const isProspectSearchSkill = skill?.id === "prospect-finder";
 
   // Per auto-profile-setup con cache: NON mostrare il form, solo risultato + Rianalizza
   const isAutoProfileWithCache = skill.id === "auto-profile-setup" && loadedFromCache && !forceNewRun;
