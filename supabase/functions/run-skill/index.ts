@@ -268,10 +268,13 @@ serve(async (req: Request) => {
             console.error(`[run-skill] commit-prospects failed (${commitResp.status}):`, commitErr.slice(0, 300));
             // Continuiamo: il client riceve i prospects comunque. Quota NON consumata.
           } else {
-            // Inietta info quota aggiornata nella response al client (ottimizzazione UX).
+            // Inietta prospects salvati (con id DB) + info quota nella response al client.
+            // commit-prospects deve ritornare data.prospects_saved = [{id, linkedin_url, short_data}, ...]
             try {
               const commitJson = await commitResp.json();
-              parsed.data.count_saved = commitJson?.data?.count ?? prospects.length;
+              const saved = commitJson?.data?.prospects_saved || commitJson?.data?.prospects || prospects;
+              parsed.data.prospects = saved; // override con la versione che ha gli id DB
+              parsed.data.count_saved = commitJson?.data?.count ?? saved.length;
               parsed.quota_consumed = {
                 searches: 1,
                 remaining_today: commitJson?.data?.quota?.remaining ?? null,
