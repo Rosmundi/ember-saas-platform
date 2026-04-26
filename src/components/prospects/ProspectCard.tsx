@@ -49,6 +49,13 @@ function initials(s: ProspectShortData): string {
   return [s.firstName?.[0], s.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
 }
 
+// Estrae azienda corrente dal currentPosition (formato harvestapi).
+function extractCompany(s: ProspectShortData): string {
+  const cp = (s.currentPosition || []) as Array<Record<string, any>>;
+  if (!cp.length) return "";
+  return cp[0]?.companyName || cp[0]?.company?.name || cp[0]?.company || "";
+}
+
 export function ProspectCard({ prospect }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -85,15 +92,21 @@ export function ProspectCard({ prospect }: Props) {
       toast.error("Devi essere loggato.");
       return;
     }
-    if (!prospect.id) {
-      toast.error("Prospect non ancora salvato. Riprova tra un secondo.");
-      return;
-    }
     setSavingWatchlist(true);
-    const { error } = await supabase.from("watchlist").insert({ user_id: user.id, prospect_id: prospect.id });
+    // Schema watchlist: {user_id, linkedin_url, nome, headline, azienda, last_snapshot, ...}
+    // (denormalizzato — nessun foreign key a prospects, dedup via UNIQUE user_id+linkedin_url).
+    const insertRow = {
+      user_id: user.id,
+      linkedin_url: prospect.linkedin_url,
+      nome: name,
+      headline: s.headline || "",
+      azienda: extractCompany(s),
+      last_snapshot: prospect.short_data as unknown as Record<string, unknown>,
+    };
+    const { error } = await supabase.from("watchlist").insert(insertRow as any);
     setSavingWatchlist(false);
     if (error) {
-      // Se è duplicato (already in watchlist) gestisci graceful.
+      // Duplicato → graceful.
       if (error.code === "23505") {
         setInWatchlist(true);
         toast.info("Già in watchlist.");
@@ -162,7 +175,7 @@ export function ProspectCard({ prospect }: Props) {
 
           <button
             onClick={addToWatchlist}
-            disabled={savingWatchlist || inWatchlist || !prospect.id}
+            disabled={savingWatchlist || inWatchlist}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-white/5 hover:bg-white/10 text-white/90 border border-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {savingWatchlist ? (
