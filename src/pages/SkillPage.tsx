@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SkillIcon } from "@/components/SkillIcon";
 import { ScoreBadge } from "@/components/ScoreBadge";
+// v3.6.1: card prospect "rich" per il risultato di prospect-search-harvest.
+import { ProspectCard, type Prospect as HarvestProspect } from "@/components/prospects/ProspectCard";
 import {
   Copy,
   RefreshCw,
@@ -806,6 +808,38 @@ function SkillOutput({
     );
   }
 
+  // v3.6.1: render dedicato a prospect-search-harvest (lista 25 prospects da Apify harvestapi).
+  // Schema item: { id?, linkedin_url, short_data: {firstName, lastName, headline, location, about, profilePicture, ...} }
+  // Diverso da prospect-finder che usa { nome, headline, fit_score, connection_request, ... }.
+  if (skillId === "prospect-search-harvest") {
+    const prospects = (data.prospects || []) as HarvestProspect[];
+    const countSaved =
+      (data.count_saved as number | undefined) ?? (data.count as number | undefined) ?? prospects.length;
+    const remainingToday = ((data as any).quota_consumed?.remaining_today ?? null) as number | null;
+    if (!prospects.length) {
+      return (
+        <div className="text-center py-8 animate-in">
+          <p className="text-sm text-muted-foreground">
+            Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-4 animate-in">
+        <div className="text-sm text-muted-foreground">
+          Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
+          {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
+        </div>
+        <div className="grid gap-3">
+          {prospects.map((p, i) => (
+            <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (skillId === "prospect-finder") {
     const prospects = data.prospects || (data.fit_score != null ? [data] : []);
     return (
@@ -1430,6 +1464,10 @@ export default function SkillPage() {
   const [error, setError] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
+  // v3.6.1: traccia il workflow effettivamente chiamato (può differire da skill.id
+  // quando il routing dirotta prospect-finder → prospect-search-harvest).
+  // Serve a SkillOutput per scegliere il render corretto.
+  const [lastEffectiveSkillId, setLastEffectiveSkillId] = useState<string | null>(null);
 
   const forceNewRun = searchParams.get("force") === "1";
   const targetSection = searchParams.get("section");
@@ -1547,6 +1585,9 @@ export default function SkillPage() {
 
     if (result.ok) {
       setOutput(result.data as Record<string, unknown>);
+      // v3.6.1: ricorda il workflow effettivo per scegliere il render corretto
+      // (es. quando prospect-finder è stato dirottato a prospect-search-harvest).
+      setLastEffectiveSkillId(effectiveSkillId);
       await logRun({
         skill: effectiveSkillId,
         input: payload,
@@ -1722,6 +1763,9 @@ export default function SkillPage() {
   };
 
   const scrapingRemaining = profile ? profile.scrapes_daily_limit - profile.scrapes_used_today : 0;
+  // v3.6.1: per prospect-finder/harvest il counter giusto è "searches", non "scrapes".
+  const searchesRemaining = profile ? Math.max(profile.searches_daily_limit - profile.searches_used_today, 0) : 0;
+  const isProspectSearchSkill = skill?.id === "prospect-finder" || skill?.id === "prospect-search-harvest";
 
   // Per auto-profile-setup con cache: NON mostrare il form, solo risultato + Rianalizza
   const isAutoProfileWithCache = skill.id === "auto-profile-setup" && loadedFromCache && !forceNewRun;
@@ -1751,8 +1795,16 @@ export default function SkillPage() {
               <SkillForm skillId={skill.id} onSubmit={handleSubmit} loading={loading} />
               {skill.usesScraping && (
                 <p className="text-xs text-warning mt-3 flex items-center gap-1">
-                  Usa 1 credito scraping{" "}
-                  <span className="text-muted-foreground">({scrapingRemaining} rimasti oggi)</span>
+                  {isProspectSearchSkill ? (
+                    <>
+                      Usa 1 search <span className="text-muted-foreground">({searchesRemaining} rimaste oggi)</span>
+                    </>
+                  ) : (
+                    <>
+                      Usa 1 credito scraping{" "}
+                      <span className="text-muted-foreground">({scrapingRemaining} rimasti oggi)</span>
+                    </>
+                  )}
                 </p>
               )}
             </CardContent>
@@ -1826,7 +1878,7 @@ export default function SkillPage() {
                 )}
               </div>
               <SkillOutput
-                skillId={skill.id}
+                skillId={lastEffectiveSkillId || skill.id}
                 output={output}
                 targetSection={targetSection}
                 onRegenerateSection={handleRegenerateSection}
