@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      icps: {
+        Row: {
+          buyer_personas: Json | null
+          created_at: string
+          description: string | null
+          exclusioni: Json | null
+          filters_override: Json | null
+          icp_json: Json
+          id: string
+          is_default: boolean
+          last_used_at: string | null
+          linkedin_search_query: Json | null
+          name: string
+          source: string
+          trigger_events: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          buyer_personas?: Json | null
+          created_at?: string
+          description?: string | null
+          exclusioni?: Json | null
+          filters_override?: Json | null
+          icp_json: Json
+          id?: string
+          is_default?: boolean
+          last_used_at?: string | null
+          linkedin_search_query?: Json | null
+          name: string
+          source?: string
+          trigger_events?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          buyer_personas?: Json | null
+          created_at?: string
+          description?: string | null
+          exclusioni?: Json | null
+          filters_override?: Json | null
+          icp_json?: Json
+          id?: string
+          is_default?: boolean
+          last_used_at?: string | null
+          linkedin_search_query?: Json | null
+          name?: string
+          source?: string
+          trigger_events?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_snapshots: {
         Row: {
           analysis: Json | null
