@@ -13,6 +13,7 @@ import SkillPage from "./pages/SkillPage";
 import History from "./pages/History";
 import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
+import Icps from "./pages/Icps";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,11 @@ const App = () => (
             <Route path="/settings" element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            } />
+            <Route path="/icps" element={
+              <ProtectedRoute>
+                <Icps />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
