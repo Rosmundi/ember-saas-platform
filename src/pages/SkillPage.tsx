@@ -1169,9 +1169,7 @@ function ProspectFinderForm({
         <TabsList className="grid grid-cols-4 w-full bg-surface/50 border border-border/30">
           <TabsTrigger value="icp">Per ICP</TabsTrigger>
           <TabsTrigger value="url">Per URL</TabsTrigger>
-          <TabsTrigger value="name" disabled className="text-muted-foreground">
-            Per nome
-          </TabsTrigger>
+          <TabsTrigger value="name">Per nome</TabsTrigger>
           <TabsTrigger value="company" disabled className="text-muted-foreground">
             Per azienda
           </TabsTrigger>
