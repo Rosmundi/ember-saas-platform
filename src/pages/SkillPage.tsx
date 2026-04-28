@@ -1914,9 +1914,18 @@ export default function SkillPage() {
   const showCacheBanner = isAutoProfileWithCache || isIcpBuilderWithCache;
   const hideFormBecauseCache = showCacheBanner;
 
+  const isProspectFinder = skill.id === "prospect-finder";
+
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div
+        className={
+          isProspectFinder
+            ? "max-w-6xl mx-auto grid gap-6 lg:grid-cols-[1fr_320px]"
+            : "max-w-3xl mx-auto space-y-6"
+        }
+      >
+        <div className="space-y-6 min-w-0">
         {/* Header */}
         <div className="flex items-start gap-4 animate-in">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -2027,7 +2036,82 @@ export default function SkillPage() {
             </CardContent>
           </Card>
         )}
+        </div>
+
+        {/* RIGHT RAIL — solo per prospect-finder */}
+        {isProspectFinder && <RecentSearchesRail />}
       </div>
     </AppLayout>
+  );
+}
+
+function RecentSearchesRail() {
+  const { searches, loading } = useRecentSearches(10);
+  return (
+    <aside className="lg:sticky lg:top-6 self-start">
+      <Card className="bg-card/80 border-border/50 backdrop-blur-sm">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HistoryIcon className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">Ricerche recenti</h3>
+            </div>
+            {searches.length > 0 && (
+              <Link
+                to="/searches"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                Vedi tutte
+              </Link>
+            )}
+          </div>
+
+          {loading && (
+            <p className="text-xs text-muted-foreground py-3">Caricamento…</p>
+          )}
+
+          {!loading && searches.length === 0 && (
+            <div className="p-4 rounded-lg border border-dashed border-border/40 text-center">
+              <p className="text-xs text-muted-foreground">
+                Nessuna ricerca ancora. Falla qui sopra.
+              </p>
+            </div>
+          )}
+
+          {!loading && searches.length > 0 && (
+            <div className="space-y-2">
+              {searches.map((s) => (
+                <Link
+                  key={s.id}
+                  to={`/skill/prospect-finder?searchId=${s.id}`}
+                  className="block p-3 rounded-lg bg-surface/40 border border-border/30 hover:border-primary/40 hover:bg-surface/70 transition-all group"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <Badge
+                      variant="outline"
+                      className={`${searchSourceColor(s.source)} text-[9px] border`}
+                    >
+                      {searchSourceLabel(s.source)}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(s.created_at).toLocaleDateString("it-IT", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
+                    {searchSummary(s)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {s.prospect_count} prospect
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </aside>
   );
 }
