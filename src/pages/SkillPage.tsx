@@ -1152,15 +1152,24 @@ function ProspectFinderForm({
     </Button>
   );
 
+  const submitBtnName = (
+    <Button
+      onClick={() => onSubmit({ ...values, searchMode: "name" })}
+      disabled={loading || !values.firstName?.trim() || !values.lastName?.trim()}
+      className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+    >
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+      {loading ? "Ricerca in corso..." : "Trova persone"}
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
       <Tabs value={searchMode} onValueChange={(v) => setMode(v as SearchMode)}>
         <TabsList className="grid grid-cols-4 w-full bg-surface/50 border border-border/30">
           <TabsTrigger value="icp">Per ICP</TabsTrigger>
           <TabsTrigger value="url">Per URL</TabsTrigger>
-          <TabsTrigger value="name" disabled className="text-muted-foreground">
-            Per nome
-          </TabsTrigger>
+          <TabsTrigger value="name">Per nome</TabsTrigger>
           <TabsTrigger value="company" disabled className="text-muted-foreground">
             Per azienda
           </TabsTrigger>
@@ -1236,10 +1245,57 @@ function ProspectFinderForm({
           {submitBtn}
         </TabsContent>
 
-        <TabsContent value="name" className="mt-4">
-          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
-            Ricerca per nome+cognome — disponibile a breve.
+        <TabsContent value="name" className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Nome <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Mario"
+                value={values.firstName || ""}
+                onChange={(e) => set("firstName", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary h-11"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Cognome <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Rossi"
+                value={values.lastName || ""}
+                onChange={(e) => set("lastName", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary h-11"
+              />
+            </div>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Parole chiave <span className="text-muted-foreground/60">(opzionale — per filtrare per ruolo o competenza)</span>
+            </label>
+            <Input
+              placeholder="es. CEO, marketing, automation"
+              value={values.keywords || ""}
+              onChange={(e) => set("keywords", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Località <span className="text-muted-foreground/60">(opzionale — default: Italia)</span>
+            </label>
+            <Input
+              placeholder="es. Milano, Lombardia, Italia"
+              value={values.location || ""}
+              onChange={(e) => set("location", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Suggerimento: usa la forma "Città, Regione, Italia" per risultati più precisi.
+            </p>
+          </div>
+          {submitBtnName}
         </TabsContent>
         <TabsContent value="company" className="mt-4">
           <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
@@ -1713,8 +1769,31 @@ export default function SkillPage() {
           linkedin_url_target: formValues.url || "",
           icp: fallbackIcp,
         };
+      } else if (mode === "name") {
+        // v3.7.2 Pezzo 2B: ricerca per nome+cognome.
+        // Bypassa l'ICP, va al workflow harvest che switcha sul branch IF (search_mode='name').
+        effectiveSkillId = "prospect-search-harvest";
+        const firstName = (formValues.firstName || "").trim();
+        const lastName = (formValues.lastName || "").trim();
+        if (!firstName || !lastName) {
+          toast.error("Inserisci nome e cognome.");
+          setLoading(false);
+          return;
+        }
+        const locations = (formValues.location || "").trim()
+          ? [(formValues.location as string).trim()]
+          : ["Italy"];
+        payload = {
+          user_id: user.id,
+          search_mode: "name",
+          firstName,
+          lastName,
+          keywords: (formValues.keywords || "").trim(),
+          locations,
+          list_name: "",
+        };
       }
-      // mode 'name' e 'company' arriveranno in 2B/2C — UI già disabled.
+      // mode 'company' arriverà in 2C — UI già disabled.
     }
 
     // SkillId è una union literal stretta in ember-types; cast esplicito perché

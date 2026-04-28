@@ -1,40 +1,19 @@
 // ============================================================================
-// Edge Function: run-skill (Gateway v3.7 — search_id support)
+// Edge Function: run-skill (Gateway v3.7.2 — search_mode dinamico)
 // ============================================================================
-// Gateway server-side per tutte le skill Ember. Sostituisce la chiamata diretta
-// browser→n8n.
+// Gateway server-side per tutte le skill Ember.
 //
-// v3.7 changelog (Pezzo 2A):
-//   - Per skill='prospect-search-harvest':
-//     a) PRE-RESPONSE: inserisce una row in `searches` (status='running',
-//        prospect_count=0) PRIMA di chiamare n8n. L'id viene poi passato a
-//        commit-prospects e ritornato al client.
-//     b) POST-RESPONSE: UPDATE della stessa row con prospect_count, duration_ms,
-//        status='completed' (o 'error' se commit fallisce).
-//     c) commit-prospects ora accetta search_id e lo scrive su ogni prospect upsert.
+// v3.7.2 changelog (Pezzo 2B):
+//   - Per skill='prospect-search-harvest', leggiamo `payload.search_mode`
+//     ('icp' default | 'name'). source e query_snapshot della row `searches`
+//     vengono valorizzati di conseguenza (es. {firstName, lastName, keywords}
+//     per name-mode invece di {icp, icp_name, ...}).
+//   - Forwardiamo sempre il payload originale a n8n: il workflow ha già un nodo IF
+//     che switcha tra branch ICP (AI Chain) e branch name (Code: build filters).
 //
-// v3.6.1 (post-response commit per prospect-search-harvest):
-//   - Workflow n8n harvest semplificato: ritorna solo prospects normalizzati.
-//     run-skill: (a) pre-check quota, (b) post-response commit-prospects atomico
-//     (upsert + consume_search_quota).
-//
-// v3.6.0 (refactor quota Ember):
-//   - Pre-check quota "searches" lato Lovable PRIMA di chiamare n8n.
-//   - Nessun cambio per le altre skill (auto-profile-setup, icp-builder, ecc.).
-//
-// Chiamante: Frontend via supabase.functions.invoke('run-skill', { ... })
-//
-// Auth:
-//   - Authorization: Bearer <JWT utente Supabase>
-//   - user_id autoritativo dal claim `sub` (NON spoofabile dal client).
-//
-// Input (JSON body):
-//   {
-//     "skillId": "...",
-//     "payload": { ... }
-//   }
-//
-// Output: proxy della risposta n8n + arricchimenti (search_id, quota_consumed).
+// v3.7 (Pezzo 2A): tracking searches.
+// v3.6.1: post-response commit-prospects.
+// v3.6.0: pre-check quota lato Lovable.
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -53,7 +32,7 @@ const ALLOWED_SKILLS = new Set<string>([
   "icp-builder",
   "outreach-drafter",
   "prospect-search-harvest",
-  // (in arrivo Pezzo 2C: "company-search")
+  // (Pezzo 2C in arrivo: "company-search")
 ]);
 
 const SEARCH_CONSUMING_SKILLS = new Set<string>([
@@ -61,13 +40,65 @@ const SEARCH_CONSUMING_SKILLS = new Set<string>([
   "prospect-finder",
 ]);
 
-const SKILL_TIMEOUT_MS = 310_000; // 310s
+const SKILL_TIMEOUT_MS = 310_000;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
+}
+
+// v3.7.2: costruisce source + query_snapshot per la row searches a partire dal payload.
+// Centralizzato qui per non sparpagliare la logica e renderla estensibile (company in 2C).
+function buildSearchAuditFromPayload(payload: Record<string, unknown>): {
+  source: "icp" | "name" | "company" | "url";
+  icpId: string | null;
+  snapshot: Record<string, unknown>;
+} {
+  const mode = (payload.search_mode as string) || "icp";
+
+  if (mode === "name") {
+    return {
+      source: "name",
+      icpId: null,
+      snapshot: {
+        search_mode: "name",
+        firstName: payload.firstName ?? "",
+        lastName: payload.lastName ?? "",
+        keywords: payload.keywords ?? "",
+        locations: payload.locations ?? null,
+      },
+    };
+  }
+
+  if (mode === "company") {
+    return {
+      source: "company",
+      icpId: (payload.icp_id as string) ?? null,
+      snapshot: {
+        search_mode: "company",
+        company_name: payload.company_name ?? "",
+        company_id: payload.company_id ?? null,
+        icp: payload.icp ?? null,
+        icp_name: payload.icp_name ?? null,
+      },
+    };
+  }
+
+  // default: 'icp'
+  return {
+    source: "icp",
+    icpId: (payload.icp_id as string) ?? null,
+    snapshot: {
+      search_mode: "icp",
+      icp: payload.icp ?? null,
+      icp_name: payload.icp_name ?? null,
+      icp_id: payload.icp_id ?? null,
+      filters_override: payload.filters_override ?? null,
+      list_name: payload.list_name ?? null,
+    },
+  };
 }
 
 serve(async (req: Request) => {
@@ -135,14 +166,13 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: false, code: "FORBIDDEN_SKILL", message: `Skill ${skillId} non consentita` }, 403);
   }
 
-  // adminClient: usato per quota check + searches insert/update (richiede service_role).
   const adminClient = serviceKey
     ? createClient(supabaseUrl, serviceKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       })
     : null;
 
-  // 4. Pre-check quota "searches" per skill che la consumano.
+  // 4. Pre-check quota "searches".
   if (SEARCH_CONSUMING_SKILLS.has(skillId)) {
     if (!adminClient) {
       console.error("[run-skill] SUPABASE_SERVICE_ROLE_KEY mancante — impossibile pre-checkare quota");
@@ -189,25 +219,17 @@ serve(async (req: Request) => {
     }
   }
 
-  // 5. v3.7: per prospect-search-harvest, INSERT row in `searches` PRIMA di chiamare n8n.
-  //    Ottieni search_id e propagalo a (a) commit-prospects, (b) UPDATE finale, (c) response.
+  // 5. v3.7+ Per prospect-search-harvest: INSERT row in `searches` PRIMA di chiamare n8n.
   let searchId: string | null = null;
   const tStart = Date.now();
   if (skillId === "prospect-search-harvest" && adminClient) {
-    // Build query_snapshot: snapshot completo del payload (ICP + filtri override + name ICP)
-    const snapshot: Record<string, unknown> = {
-      icp: (payload as any).icp ?? null,
-      icp_name: (payload as any).icp_name ?? null,
-      icp_id: (payload as any).icp_id ?? null,
-      filters_override: (payload as any).filters_override ?? null,
-      list_name: (payload as any).list_name ?? null,
-    };
+    const { source, icpId, snapshot } = buildSearchAuditFromPayload(payload);
     const { data: searchRow, error: searchErr } = await adminClient
       .from("searches")
       .insert({
         user_id: userId,
-        source: "icp",
-        icp_id: (payload as any).icp_id ?? null,
+        source,
+        icp_id: icpId,
         query_snapshot: snapshot,
         status: "running",
         prospect_count: 0,
@@ -216,7 +238,6 @@ serve(async (req: Request) => {
       .single();
     if (searchErr) {
       console.warn("[run-skill] searches insert failed (non-fatal):", searchErr.message);
-      // Non blocchiamo: la search procede senza tracking, ma logghiamo.
     } else {
       searchId = (searchRow as any)?.id ?? null;
     }
@@ -244,7 +265,7 @@ serve(async (req: Request) => {
 
     const text = await upstream.text();
 
-    // 8. v3.7: post-response commit + UPDATE searches per prospect-search-harvest.
+    // 8. Post-response per prospect-search-harvest: commit + UPDATE searches.
     if (skillId === "prospect-search-harvest" && upstream.status === 200) {
       try {
         const parsed = JSON.parse(text);
@@ -252,7 +273,6 @@ serve(async (req: Request) => {
         const durationMs = Date.now() - tStart;
 
         if (Array.isArray(prospects) && prospects.length > 0 && serviceKey) {
-          // 8a. commit-prospects con search_id
           const commitUrl = `${supabaseUrl}/functions/v1/commit-prospects`;
           const commitResp = await fetch(commitUrl, {
             method: "POST",
@@ -271,7 +291,6 @@ serve(async (req: Request) => {
           if (!commitResp.ok) {
             const commitErr = await commitResp.text();
             console.error(`[run-skill] commit-prospects failed (${commitResp.status}):`, commitErr.slice(0, 300));
-            // 8b. UPDATE searches con error (se abbiamo searchId)
             if (searchId && adminClient) {
               await adminClient
                 .from("searches")
@@ -282,7 +301,6 @@ serve(async (req: Request) => {
                 } as any)
                 .eq("id", searchId);
             }
-            // Continuiamo: il client riceve i prospects comunque. Quota NON consumata.
           } else {
             try {
               const commitJson = await commitResp.json();
@@ -297,7 +315,6 @@ serve(async (req: Request) => {
                 remaining_today: commitJson?.data?.quota?.remaining ?? null,
               };
 
-              // 8c. UPDATE searches con status=completed + count + duration
               if (searchId && adminClient) {
                 await adminClient
                   .from("searches")
@@ -315,7 +332,6 @@ serve(async (req: Request) => {
               });
             } catch (parseErr) {
               console.warn("[run-skill] commit response parse failed:", parseErr);
-              // fallthrough alla response originale n8n (sotto)
             }
           }
         } else {
@@ -333,7 +349,6 @@ serve(async (req: Request) => {
         }
       } catch (parseErr) {
         console.warn("[run-skill] post-response parse failed (non-fatal):", parseErr);
-        // Marca search come error per non lasciarla 'running' indefinitamente.
         if (searchId && adminClient) {
           await adminClient
             .from("searches")
@@ -355,7 +370,6 @@ serve(async (req: Request) => {
     clearTimeout(timer);
     const isAbort = err instanceof DOMException && err.name === "AbortError";
 
-    // Marca search come error se l'avevamo creata.
     if (searchId && adminClient) {
       await adminClient
         .from("searches")
