@@ -1,57 +1,40 @@
 // ============================================================================
-// Edge Function: run-skill (Gateway v3.6.1)
+// Edge Function: run-skill (Gateway v3.7 — search_id support)
 // ============================================================================
 // Gateway server-side per tutte le skill Ember. Sostituisce la chiamata diretta
-// browser→n8n. Chiuso il leak di VITE_EMBER_KEY dal bundle pubblico.
+// browser→n8n.
+//
+// v3.7 changelog (Pezzo 2A):
+//   - Per skill='prospect-search-harvest':
+//     a) PRE-RESPONSE: inserisce una row in `searches` (status='running',
+//        prospect_count=0) PRIMA di chiamare n8n. L'id viene poi passato a
+//        commit-prospects e ritornato al client.
+//     b) POST-RESPONSE: UPDATE della stessa row con prospect_count, duration_ms,
+//        status='completed' (o 'error' se commit fallisce).
+//     c) commit-prospects ora accetta search_id e lo scrive su ogni prospect upsert.
 //
 // v3.6.1 (post-response commit per prospect-search-harvest):
-//   - Il workflow n8n harvest è stato semplificato (no più quota, no più upsert).
-//     Restituisce solo prospects normalizzati. run-skill ora si occupa di:
-//       (a) pre-check quota PRIMA di chiamare n8n (come v3.6.0)
-//       (b) post-response: se skillId='prospect-search-harvest' e prospects.length>0,
-//           chiama commit-prospects (atomico: upsert + consume_search_quota).
-//   - Tutto su Lovable+Supabase, n8n resta "stupido": entra ICP, esce lista.
+//   - Workflow n8n harvest semplificato: ritorna solo prospects normalizzati.
+//     run-skill: (a) pre-check quota, (b) post-response commit-prospects atomico
+//     (upsert + consume_search_quota).
 //
 // v3.6.0 (refactor quota Ember):
-//   - Pre-check quota "searches" lato Lovable PRIMA di chiamare n8n, per le
-//     skill che consumano searches_* (prospect-search-harvest, prospect-finder).
-//   - Se l'utente è a 0 search rimanenti, il webhook n8n NON parte: ritorniamo
-//     429 QUOTA_EXCEEDED direttamente al client con reset_at.
+//   - Pre-check quota "searches" lato Lovable PRIMA di chiamare n8n.
 //   - Nessun cambio per le altre skill (auto-profile-setup, icp-builder, ecc.).
 //
 // Chiamante: Frontend via supabase.functions.invoke('run-skill', { ... })
 //
 // Auth:
-//   - Authorization: Bearer <JWT utente Supabase>  (richiesta - browser)
-//   - La JWT viene verificata; il user_id autoritativo è preso dal claim `sub`.
-//     Il client NON può spoofare user_id (qualsiasi `user_id` nel payload viene
-//     sovrascritto).
+//   - Authorization: Bearer <JWT utente Supabase>
+//   - user_id autoritativo dal claim `sub` (NON spoofabile dal client).
 //
 // Input (JSON body):
 //   {
-//     "skillId": "auto-profile-setup" | "regenerate-section" | "prospect-search-harvest" | ...,
-//     "payload": { ...campi skill-specifici... }
+//     "skillId": "...",
+//     "payload": { ... }
 //   }
 //
-// Output: proxy della risposta n8n as-is (inclusi status 4xx/5xx) + header
-//   Content-Type: application/json.
-//
-// Errori gateway:
-//   401 { ok: false, code: "UNAUTHORIZED" }          // JWT mancante/invalida
-//   400 { ok: false, code: "BAD_REQUEST", message }  // body malformato
-//   403 { ok: false, code: "FORBIDDEN_SKILL" }       // skillId non in whitelist
-//   429 { ok: false, code: "QUOTA_EXCEEDED", data:{used, limit, remaining, reset_at} }
-//   404 { ok: false, code: "PROFILE_NOT_FOUND" }     // profilo mancante (edge case)
-//   502 { ok: false, code: "UPSTREAM_ERROR" }        // n8n unreachable
-//   504 { ok: false, code: "UPSTREAM_TIMEOUT" }      // n8n > SKILL_TIMEOUT_MS
-//   500 { ok: false, code: "INTERNAL", message }     // config mancante / bug
-//
-// Env vars richieste (Lovable Secrets):
-//   EMBER_INTERNAL_KEY         = shared secret n8n (stessa dell'If-guard n8n)
-//   N8N_BASE_URL               = https://n8n.archetipo.info/webhook  (opzionale, default)
-//   SUPABASE_URL               = auto-iniettata
-//   SUPABASE_ANON_KEY          = auto-iniettata (per verificare JWT)
-//   SUPABASE_SERVICE_ROLE_KEY  = auto-iniettata (per RPC reset + SELECT quota bypass RLS)
+// Output: proxy della risposta n8n + arricchimenti (search_id, quota_consumed).
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -63,30 +46,21 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Whitelist delle skill ammesse. Aggiungere qui quando ne arrivano di nuove.
-// Any skillId non in lista → 403.
 const ALLOWED_SKILLS = new Set<string>([
   "auto-profile-setup",
   "regenerate-section",
-  // prospect-finder = workflow live attuale (scrape 1 URL + fit_score vs ICP)
   "prospect-finder",
-  // icp-builder = costruzione ICP/buyer personas (usato dal form Dashboard)
   "icp-builder",
-  // outreach-drafter = scrivi messaggio di primo contatto per un prospect
   "outreach-drafter",
-  // prospect-search-harvest = workflow evolutivo (search massiva ICP→lista)
   "prospect-search-harvest",
-  // aggiungere in futuro: profile-optimizer, post-writer, visual-post-builder,
-  // content-performance, reply-suggester, network-intelligence
+  // (in arrivo Pezzo 2C: "company-search")
 ]);
 
-// Skill che consumano 1 "search" (quota giornaliera searches_daily_limit).
-// Pre-check forzato PRIMA di forwardare a n8n.
-const SEARCH_CONSUMING_SKILLS = new Set<string>(["prospect-search-harvest", "prospect-finder"]);
+const SEARCH_CONSUMING_SKILLS = new Set<string>([
+  "prospect-search-harvest",
+  "prospect-finder",
+]);
 
-// Timeout upstream n8n. Tenere < wall-time Edge Function (Lovable Pro = 400s).
-// Tenere >= timeout client (ember-api.ts callSkill = 300s) così è sempre
-// il client a timeoutare per primo con messaggio UX consistente.
 const SKILL_TIMEOUT_MS = 310_000; // 310s
 
 function jsonResponse(body: unknown, status = 200) {
@@ -120,9 +94,11 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: false, code: "INTERNAL", message: "Supabase env vars mancanti" }, 500);
   }
 
-  // 2. Verifica JWT. Prendiamo l'Authorization header as-is, passiamo a supabase.auth.getUser.
+  // 2. Verifica JWT.
   const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  const token = authHeader.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
   if (!token) {
     return jsonResponse({ ok: false, code: "UNAUTHORIZED", message: "Missing bearer token" }, 401);
   }
@@ -159,19 +135,20 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: false, code: "FORBIDDEN_SKILL", message: `Skill ${skillId} non consentita` }, 403);
   }
 
+  // adminClient: usato per quota check + searches insert/update (richiede service_role).
+  const adminClient = serviceKey
+    ? createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : null;
+
   // 4. Pre-check quota "searches" per skill che la consumano.
-  //    Facciamo reset-se-scaduta + SELECT fresca. Se esaurita → 429 immediato.
-  //    Serve service_role per bypassare RLS (stesso pattern di check-search-quota).
   if (SEARCH_CONSUMING_SKILLS.has(skillId)) {
-    if (!serviceKey) {
+    if (!adminClient) {
       console.error("[run-skill] SUPABASE_SERVICE_ROLE_KEY mancante — impossibile pre-checkare quota");
       return jsonResponse({ ok: false, code: "INTERNAL", message: "Service role key mancante" }, 500);
     }
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
 
-    // 4a. Reset se la finestra giornaliera è passata.
     const { error: resetErr } = await adminClient.rpc("reset_searches_quota_if_due", {
       p_user_id: userId,
     });
@@ -180,7 +157,6 @@ serve(async (req: Request) => {
       return jsonResponse({ ok: false, code: "INTERNAL", message: resetErr.message }, 500);
     }
 
-    // 4b. Leggi lo stato fresco.
     const { data: quotaRow, error: selErr } = await adminClient
       .from("profiles")
       .select("searches_used_today, searches_daily_limit, searches_reset_at")
@@ -197,11 +173,9 @@ serve(async (req: Request) => {
 
     const used = Number(quotaRow.searches_used_today ?? 0);
     const limit = Number(quotaRow.searches_daily_limit ?? 0);
-    const remaining = Math.max(limit - used, 0);
     const resetAt = quotaRow.searches_reset_at;
 
     if (used >= limit) {
-      // Niente webhook — utente informato subito.
       console.info(`[run-skill] QUOTA_EXCEEDED pre-check ${skillId} user=${userId} used=${used}/${limit}`);
       return jsonResponse(
         {
@@ -213,13 +187,45 @@ serve(async (req: Request) => {
         429,
       );
     }
-    // altrimenti proseguiamo al forward.
   }
 
-  // 5. Inietta user_id autoritativo dal JWT. Sovrascrive qualsiasi valore client.
+  // 5. v3.7: per prospect-search-harvest, INSERT row in `searches` PRIMA di chiamare n8n.
+  //    Ottieni search_id e propagalo a (a) commit-prospects, (b) UPDATE finale, (c) response.
+  let searchId: string | null = null;
+  const tStart = Date.now();
+  if (skillId === "prospect-search-harvest" && adminClient) {
+    // Build query_snapshot: snapshot completo del payload (ICP + filtri override + name ICP)
+    const snapshot: Record<string, unknown> = {
+      icp: (payload as any).icp ?? null,
+      icp_name: (payload as any).icp_name ?? null,
+      icp_id: (payload as any).icp_id ?? null,
+      filters_override: (payload as any).filters_override ?? null,
+      list_name: (payload as any).list_name ?? null,
+    };
+    const { data: searchRow, error: searchErr } = await adminClient
+      .from("searches")
+      .insert({
+        user_id: userId,
+        source: "icp",
+        icp_id: (payload as any).icp_id ?? null,
+        query_snapshot: snapshot,
+        status: "running",
+        prospect_count: 0,
+      } as any)
+      .select("id")
+      .single();
+    if (searchErr) {
+      console.warn("[run-skill] searches insert failed (non-fatal):", searchErr.message);
+      // Non blocchiamo: la search procede senza tracking, ma logghiamo.
+    } else {
+      searchId = (searchRow as any)?.id ?? null;
+    }
+  }
+
+  // 6. Inietta user_id autoritativo dal JWT.
   const forwardBody = { ...payload, user_id: userId };
 
-  // 6. Forward a n8n con X-Ember-Key + AbortController timeout.
+  // 7. Forward a n8n.
   const targetUrl = `${n8nBase}/ember/${skillId}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SKILL_TIMEOUT_MS);
@@ -236,60 +242,108 @@ serve(async (req: Request) => {
     });
     clearTimeout(timer);
 
-    // Proxy body + status. Content-Type forzato a JSON (n8n Respond to Webhook
-    // JSON ritorna sempre application/json; se fosse altro, è un bug upstream).
     const text = await upstream.text();
 
-    // v3.6.1: post-response commit per prospect-search-harvest.
-    // Il workflow n8n semplificato non fa più upsert né consumo quota.
-    // Qui chiamiamo commit-prospects (atomico: upsert prospects + consume_search_quota).
-    // Se commit fallisce, NON facciamo crashare la response al client: logghiamo e
-    // restituiamo i prospects (l'utente li ha visti). La quota resta non consumata
-    // → al prossimo retry l'utente non perde una "search" gratis. Trade-off accettabile
-    // per MVP: meglio under-charge che lasciare l'utente senza output.
+    // 8. v3.7: post-response commit + UPDATE searches per prospect-search-harvest.
     if (skillId === "prospect-search-harvest" && upstream.status === 200) {
       try {
         const parsed = JSON.parse(text);
         const prospects = parsed?.data?.prospects;
+        const durationMs = Date.now() - tStart;
+
         if (Array.isArray(prospects) && prospects.length > 0 && serviceKey) {
+          // 8a. commit-prospects con search_id
           const commitUrl = `${supabaseUrl}/functions/v1/commit-prospects`;
           const commitResp = await fetch(commitUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${serviceKey}`,
-              apikey: serviceKey,
+              "Authorization": `Bearer ${serviceKey}`,
+              "apikey": serviceKey,
               "x-ember-key": internalKey,
             },
-            body: JSON.stringify({ user_id: userId, prospects }),
+            body: JSON.stringify({
+              user_id: userId,
+              prospects,
+              search_id: searchId,
+            }),
           });
           if (!commitResp.ok) {
             const commitErr = await commitResp.text();
             console.error(`[run-skill] commit-prospects failed (${commitResp.status}):`, commitErr.slice(0, 300));
+            // 8b. UPDATE searches con error (se abbiamo searchId)
+            if (searchId && adminClient) {
+              await adminClient
+                .from("searches")
+                .update({
+                  status: "error",
+                  error_message: `commit-prospects failed: ${commitResp.status}`,
+                  duration_ms: durationMs,
+                } as any)
+                .eq("id", searchId);
+            }
             // Continuiamo: il client riceve i prospects comunque. Quota NON consumata.
           } else {
-            // Inietta prospects salvati (con id DB) + info quota nella response al client.
-            // commit-prospects deve ritornare data.prospects_saved = [{id, linkedin_url, short_data}, ...]
             try {
               const commitJson = await commitResp.json();
               const saved = commitJson?.data?.prospects_saved || commitJson?.data?.prospects || prospects;
-              parsed.data.prospects = saved; // override con la versione che ha gli id DB
-              parsed.data.count_saved = commitJson?.data?.count ?? saved.length;
+              const savedCount = commitJson?.data?.count ?? saved.length;
+
+              parsed.data.prospects = saved;
+              parsed.data.count_saved = savedCount;
+              parsed.data.search_id = searchId;
               parsed.quota_consumed = {
                 searches: 1,
                 remaining_today: commitJson?.data?.quota?.remaining ?? null,
               };
+
+              // 8c. UPDATE searches con status=completed + count + duration
+              if (searchId && adminClient) {
+                await adminClient
+                  .from("searches")
+                  .update({
+                    status: "completed",
+                    prospect_count: savedCount,
+                    duration_ms: durationMs,
+                  } as any)
+                  .eq("id", searchId);
+              }
+
               return new Response(JSON.stringify(parsed), {
                 status: 200,
                 headers: { "Content-Type": "application/json", ...CORS_HEADERS },
               });
-            } catch {
-              // commitResp non era JSON parseable — proseguiamo con la response originale n8n.
+            } catch (parseErr) {
+              console.warn("[run-skill] commit response parse failed:", parseErr);
+              // fallthrough alla response originale n8n (sotto)
             }
+          }
+        } else {
+          // Nessun prospect trovato: marca searches come completed con count=0.
+          if (searchId && adminClient) {
+            await adminClient
+              .from("searches")
+              .update({
+                status: "completed",
+                prospect_count: 0,
+                duration_ms: durationMs,
+              } as any)
+              .eq("id", searchId);
           }
         }
       } catch (parseErr) {
         console.warn("[run-skill] post-response parse failed (non-fatal):", parseErr);
+        // Marca search come error per non lasciarla 'running' indefinitamente.
+        if (searchId && adminClient) {
+          await adminClient
+            .from("searches")
+            .update({
+              status: "error",
+              error_message: "Response upstream non parsabile",
+              duration_ms: Date.now() - tStart,
+            } as any)
+            .eq("id", searchId);
+        }
       }
     }
 
@@ -300,16 +354,22 @@ serve(async (req: Request) => {
   } catch (err) {
     clearTimeout(timer);
     const isAbort = err instanceof DOMException && err.name === "AbortError";
+
+    // Marca search come error se l'avevamo creata.
+    if (searchId && adminClient) {
+      await adminClient
+        .from("searches")
+        .update({
+          status: "error",
+          error_message: isAbort ? "n8n timeout" : `Upstream error: ${String(err)}`,
+          duration_ms: Date.now() - tStart,
+        } as any)
+        .eq("id", searchId);
+    }
+
     if (isAbort) {
       console.error(`[run-skill] Timeout n8n su ${skillId} (user ${userId})`);
-      return jsonResponse(
-        {
-          ok: false,
-          code: "UPSTREAM_TIMEOUT",
-          message: `n8n non ha risposto entro ${Math.round(SKILL_TIMEOUT_MS / 1000)}s`,
-        },
-        504,
-      );
+      return jsonResponse({ ok: false, code: "UPSTREAM_TIMEOUT", message: `n8n non ha risposto entro ${Math.round(SKILL_TIMEOUT_MS / 1000)}s` }, 504);
     }
     console.error(`[run-skill] Errore upstream n8n:`, err);
     return jsonResponse({ ok: false, code: "UPSTREAM_ERROR", message: String(err) }, 502);

@@ -1,21 +1,16 @@
 // src/hooks/useIcps.ts
 // ============================================================================
 // Hook per CRUD ICP multipli (tabella `icps`, migration 009).
-// Sostituisce la lettura/scrittura di profiles.raw_profile_data.icp_current.
 //
-// Backward compatibility (Pezzo 1):
-//   - Quando un ICP viene salvato come default, scriviamo IN SHADOW anche
-//     profiles.raw_profile_data.icp_current. Così SkillPage (prospect-finder)
-//     continua a leggere il default come faceva prima, senza modifiche, finché
-//     il Pezzo 2 (Ricerca diretta) non sostituirà la lettura con un picker
-//     esplicito basato su `icps`.
-//   - Quando un ICP non-default viene rinominato/modificato, NON tocchiamo
-//     icp_current (il default è altro).
-//   - Eliminare il default lascia raw_profile_data.icp_current intatto (no auto-promo
-//     a un altro ICP). L'utente deve scegliere esplicitamente un nuovo default.
+// v3.7 (Pezzo 2A) — RIMOSSO shadow write su raw_profile_data.icp_current:
+//   Da quando il prospect-finder usa un picker ICP esplicito (Pezzo 2A),
+//   raw_profile_data.icp_current non viene più letto da nessuno. Lo lasciamo
+//   intatto nel DB per safety/rollback ma non lo aggiorniamo più.
 //
-// RLS: la tabella `icps` ha policy che permette SELECT/INSERT/UPDATE/DELETE solo
-// al proprietario. Niente fetch lato server-key.
+// v3.7 (Pezzo 1) — versione originale con shadow write (ora deprecata).
+//
+// RLS: la tabella `icps` ha policy che permette SELECT/INSERT/UPDATE/DELETE
+// solo al proprietario.
 // ============================================================================
 
 import { useEffect, useState, useCallback } from "react";
@@ -61,46 +56,6 @@ export interface IcpCreateInput {
 export interface IcpUpdateInput extends Partial<IcpCreateInput> {}
 
 // ============================================================================
-// Helpers backward compatibility
-// ============================================================================
-
-async function shadowWriteIcpCurrent(userId: string, icp: IcpRow | null): Promise<void> {
-  const { data: fresh } = await supabase
-    .from("profiles")
-    .select("raw_profile_data")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const currentRaw = ((fresh as any)?.raw_profile_data || {}) as Record<string, unknown>;
-
-  let newIcpCurrent: Record<string, unknown> | null;
-  if (icp) {
-    newIcpCurrent = {
-      generated_at: icp.created_at,
-      icp: icp.icp_json,
-      buyer_personas: icp.buyer_personas ?? null,
-      linkedin_search_query: icp.linkedin_search_query ?? null,
-      trigger_events: icp.trigger_events ?? null,
-      exclusioni: icp.exclusioni ?? null,
-      user_input: icp.description ?? "",
-      _shadow_from_icps: true,
-      _icp_id: icp.id,
-    };
-  } else {
-    return;
-  }
-
-  const merged = { ...currentRaw, icp_current: newIcpCurrent };
-  const { error } = await supabase
-    .from("profiles")
-    .update({ raw_profile_data: merged } as any)
-    .eq("user_id", userId);
-  if (error) {
-    // eslint-disable-next-line no-console
-    console.warn("[useIcps] shadow write icp_current failed (non-fatal):", error.message);
-  }
-}
-
-// ============================================================================
 // Hook principale
 // ============================================================================
 
@@ -140,6 +95,8 @@ export function useIcps() {
 
   const defaultIcp = icps.find((i) => i.is_default) ?? null;
 
+  // ----- Mutazioni ----------
+
   const create = useCallback(
     async (input: IcpCreateInput): Promise<IcpRow | null> => {
       if (!user) return null;
@@ -168,9 +125,6 @@ export function useIcps() {
       }
       const created = data as unknown as IcpRow;
       await fetchIcps();
-      if (created.is_default) {
-        await shadowWriteIcpCurrent(user.id, created);
-      }
       return created;
     },
     [user, icps.length, fetchIcps],
@@ -196,9 +150,6 @@ export function useIcps() {
       }
       const updated = data as unknown as IcpRow;
       await fetchIcps();
-      if (updated.is_default) {
-        await shadowWriteIcpCurrent(user.id, updated);
-      }
       return updated;
     },
     [user, fetchIcps],
