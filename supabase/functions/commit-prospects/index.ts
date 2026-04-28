@@ -1,45 +1,24 @@
 // ============================================================================
-// Edge Function: commit-prospects
+// Edge Function: commit-prospects (v3.7 — search_id support)
 // ============================================================================
-// Endpoint Lovable Cloud chiamato da n8n DOPO che Apify ha restituito i profili.
-// Fa 2 cose atomiche (in quest'ordine):
-//   1. UPSERT dei prospects in `prospects` (dedup per user_id+linkedin_url)
-//   2. Chiama RPC consume_search_quota(user_id) per incrementare la quota
+// Endpoint chiamato da run-skill (post-response prospect-search-harvest).
+// Fa 3 cose:
+//   1. UPSERT dei prospects in `prospects` (dedup user_id+linkedin_url)
+//      Se viene passato search_id, viene scritto sui rows nuovi/aggiornati.
+//   2. Chiama RPC consume_search_quota(user_id) per incrementare la quota.
+//   3. Ritorna { prospects_saved, count, quota, search_id }.
 //
-// Trade-off: se consume_search_quota fallisce per QUOTA_EXCEEDED (race tra 2 tab),
-// i prospects sono GIÀ stati salvati. L'utente se li trova in lista ma riceve un
-// warning quota. Accettabile per MVP — alternativa è transaction plpgsql custom.
+// Trade-off (invariato): se consume_search_quota fallisce per QUOTA_EXCEEDED
+// (race tra 2 tab), i prospects sono GIÀ stati salvati. L'utente li trova in lista
+// ma riceve un warning quota.
 //
-// Auth: header X-Ember-Key (stessa di check-search-quota).
+// v3.7 changelog (Pezzo 2A):
+//   - Accetta nuovo param opzionale `search_id` (uuid).
+//   - Lo include in ogni row dell'upsert in `prospects` per back-reference.
+//   - run-skill è responsabile di: (a) creare la row `searches` PRIMA, (b) passare
+//     l'id qui, (c) UPDATE `searches` con prospect_count/duration/status DOPO.
 //
-// Input (JSON body):
-//   {
-//     "user_id": "<uuid>",
-//     "prospects": [
-//       {
-//         "linkedin_url": "https://...",
-//         "short_data": { ... },
-//         "source_search_at": "2026-04-22T10:00:00.000Z"  // opzionale, default now()
-//       },
-//       ...
-//     ]
-//   }
-//
-// Output success (200):
-//   {
-//     "ok": true,
-//     "data": {
-//       "prospects_saved": [{id, linkedin_url, ...}, ...],
-//       "count": 25,
-//       "quota": { "used": 4, "limit": 20, "remaining": 16, "reset_at": "..." }
-//     }
-//   }
-//
-// Output errori:
-//   401 UNAUTHORIZED
-//   400 BAD_REQUEST
-//   409 QUOTA_EXCEEDED (prospects comunque salvati — vedi trade-off)
-//   500 INTERNAL
+// Auth: header X-Ember-Key (stessa di run-skill internal).
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -73,10 +52,9 @@ serve(async (req: Request) => {
   }
 
   // 1. Auth guard.
-  //    Nome canonico: EMBER_INTERNAL_KEY (server-to-server, non è "shared" col frontend).
   const internalKey = Deno.env.get("EMBER_INTERNAL_KEY");
   if (!internalKey) {
-    console.error("[commit-prospects] EMBER_INTERNAL_KEY non configurata su Lovable Secrets");
+    console.error("[commit-prospects] EMBER_INTERNAL_KEY non configurata");
     return jsonResponse({ ok: false, code: "INTERNAL", message: "Missing EMBER_INTERNAL_KEY" }, 500);
   }
   if (req.headers.get("x-ember-key") !== internalKey) {
@@ -84,7 +62,7 @@ serve(async (req: Request) => {
   }
 
   // 2. Parse body.
-  let body: { user_id?: string; prospects?: ProspectInput[] };
+  let body: { user_id?: string; prospects?: ProspectInput[]; search_id?: string };
   try {
     body = await req.json();
   } catch {
@@ -92,6 +70,9 @@ serve(async (req: Request) => {
   }
   const userId = body?.user_id;
   const prospectsIn = body?.prospects;
+  const searchId = typeof body?.search_id === "string" && body.search_id.length > 0
+    ? body.search_id
+    : null;
 
   if (!userId || typeof userId !== "string") {
     return jsonResponse({ ok: false, code: "BAD_REQUEST", message: "user_id mancante" }, 400);
@@ -109,6 +90,8 @@ serve(async (req: Request) => {
       linkedin_url: p.linkedin_url.trim(),
       short_data: p.short_data ?? {},
       source_search_at: typeof p.source_search_at === "string" ? p.source_search_at : now,
+      // v3.7: collegamento alla search di provenienza (può essere null per chiamate legacy).
+      ...(searchId ? { search_id: searchId } : {}),
     }));
 
   // Edge case: array vuoto (Apify non ha trovato nulla) — non consumare quota.
@@ -119,6 +102,7 @@ serve(async (req: Request) => {
         prospects_saved: [],
         count: 0,
         quota_consumed: false,
+        search_id: searchId,
         note: "Nessun prospect da salvare, quota non consumata",
       },
     });
@@ -136,24 +120,23 @@ serve(async (req: Request) => {
   });
 
   try {
-    // 4. UPSERT prospects (dedup user_id+linkedin_url già enforced dal UNIQUE index).
+    // 4. UPSERT prospects (dedup user_id+linkedin_url enforced dal UNIQUE index).
     const { data: saved, error: upsertErr } = await supabase
       .from("prospects")
       .upsert(rows, { onConflict: "user_id,linkedin_url", ignoreDuplicates: false })
-      .select("id, linkedin_url, short_data, source_search_at");
+      .select("id, linkedin_url, short_data, source_search_at, search_id");
 
     if (upsertErr) {
       console.error("[commit-prospects] upsert error:", upsertErr);
       return jsonResponse({ ok: false, code: "INTERNAL", message: upsertErr.message }, 500);
     }
 
-    // 5. Consume quota atomicamente via RPC. Se solleva quota_exceeded → 409.
+    // 5. Consume quota atomicamente via RPC.
     const { data: quotaData, error: quotaErr } = await supabase.rpc("consume_search_quota", {
       p_user_id: userId,
     });
 
     if (quotaErr) {
-      // Distingui quota_exceeded (P0001) da altri errori.
       const msg = String(quotaErr.message || "");
       if (msg.includes("quota_exceeded")) {
         console.warn("[commit-prospects] quota exceeded after upsert — race condition", userId);
@@ -166,6 +149,7 @@ serve(async (req: Request) => {
               prospects_saved: saved ?? [],
               count: (saved ?? []).length,
               quota_consumed: false,
+              search_id: searchId,
             },
           },
           409,
@@ -183,6 +167,7 @@ serve(async (req: Request) => {
         prospects_saved: saved ?? [],
         count: (saved ?? []).length,
         quota_consumed: true,
+        search_id: searchId,
         quota: {
           used: Number(quota.searches_used_today ?? 0),
           limit: Number(quota.searches_daily_limit ?? 0),

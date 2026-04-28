@@ -14,6 +14,7 @@ import History from "./pages/History";
 import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
 import Icps from "./pages/Icps";
+import Searches from "./pages/Searches";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,11 @@ const App = () => (
             <Route path="/icps" element={
               <ProtectedRoute>
                 <Icps />
+              </ProtectedRoute>
+            } />
+            <Route path="/searches" element={
+              <ProtectedRoute>
+                <Searches />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

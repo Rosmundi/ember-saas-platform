@@ -1,4 +1,4 @@
-// src/pages/SkillPage.tsx — v3.4: cache analisi profilo + deep-link sezione + rigenera per sezione
+// src/pages/SkillPage.tsx — v3.7 Pezzo 2A: picker ICP + tab multi-mode + right rail ricerche
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -6,6 +6,14 @@ import { SKILLS, canUseSkill } from "@/lib/ember-types";
 import { callSkill, callRegenerateSection, emberErrorMessage } from "@/lib/ember-api";
 import { useProfile } from "@/hooks/useProfile";
 import { useSkillRuns } from "@/hooks/useSkillRuns";
+import { useIcps } from "@/hooks/useIcps";
+import {
+  useRecentSearches,
+  useSearchById,
+  searchSourceLabel,
+  searchSourceColor,
+  searchSummary,
+} from "@/hooks/useSearches";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SkillIcon } from "@/components/SkillIcon";
 import { ScoreBadge } from "@/components/ScoreBadge";
 // v3.6.1: card prospect "rich" per il risultato di prospect-search-harvest.
@@ -28,6 +37,8 @@ import {
   Sparkles,
   AlertTriangle,
   Wand2,
+  History as HistoryIcon,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -816,26 +827,39 @@ function SkillOutput({
     const countSaved =
       (data.count_saved as number | undefined) ?? (data.count as number | undefined) ?? prospects.length;
     const remainingToday = ((data as any).quota_consumed?.remaining_today ?? null) as number | null;
-    if (!prospects.length) {
-      return (
-        <div className="text-center py-8 animate-in">
-          <p className="text-sm text-muted-foreground">
-            Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
-          </p>
-        </div>
-      );
-    }
+    const fromHistory = (data as any)._from_history === true;
     return (
       <div className="space-y-4 animate-in">
-        <div className="text-sm text-muted-foreground">
-          Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
-          {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
-        </div>
-        <div className="grid gap-3">
-          {prospects.map((p, i) => (
-            <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
-          ))}
-        </div>
+        {fromHistory && (
+          <div className="flex items-center justify-between gap-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <HistoryIcon className="h-4 w-4 text-blue-400 shrink-0" />
+              <span>Stai vedendo una ricerca passata. Nessuna quota consumata.</span>
+            </div>
+            <Button asChild size="sm" variant="outline" className="border-border/50">
+              <Link to="/skill/prospect-finder">Nuova ricerca</Link>
+            </Button>
+          </div>
+        )}
+        {!prospects.length ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">
+              Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-muted-foreground">
+              Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
+              {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
+            </div>
+            <div className="grid gap-3">
+              {prospects.map((p, i) => (
+                <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -1078,6 +1102,155 @@ function formatIcpForTextarea(icp: any): string {
   return out.join("\n\n");
 }
 
+// ============================================================================
+// ProspectFinderForm (v3.7 Pezzo 2A) — tab multi-mode
+// ============================================================================
+
+type SearchMode = "icp" | "url" | "name" | "company";
+
+function ProspectFinderForm({
+  values,
+  setValues,
+  loading,
+  onSubmit,
+}: {
+  values: Record<string, string>;
+  setValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  loading: boolean;
+  onSubmit: (data: Record<string, string>) => void;
+}) {
+  const { icps, defaultIcp, loading: loadingIcps } = useIcps();
+  const [searchMode, setSearchMode] = useState<SearchMode>(
+    (values.searchMode as SearchMode) || (values.url ? "url" : "icp"),
+  );
+
+  const setMode = (m: SearchMode) => {
+    setSearchMode(m);
+    setValues((prev) => ({ ...prev, searchMode: m }));
+  };
+  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
+
+  useEffect(() => {
+    if (defaultIcp && !values.icpId) {
+      setValues((prev) => ({ ...prev, icpId: defaultIcp.id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultIcp?.id]);
+
+  const submitBtn = (
+    <Button
+      onClick={() => onSubmit({ ...values, searchMode })}
+      disabled={
+        loading ||
+        (searchMode === "icp" && !values.icpId) ||
+        (searchMode === "url" && !values.url)
+      }
+      className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+    >
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+      {loading ? "Ricerca in corso..." : "Trova prospect"}
+    </Button>
+  );
+
+  return (
+    <div className="space-y-4">
+      <Tabs value={searchMode} onValueChange={(v) => setMode(v as SearchMode)}>
+        <TabsList className="grid grid-cols-4 w-full bg-surface/50 border border-border/30">
+          <TabsTrigger value="icp">Per ICP</TabsTrigger>
+          <TabsTrigger value="url">Per URL</TabsTrigger>
+          <TabsTrigger value="name" disabled className="text-muted-foreground">
+            Per nome
+          </TabsTrigger>
+          <TabsTrigger value="company" disabled className="text-muted-foreground">
+            Per azienda
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="icp" className="space-y-4 mt-4">
+          {loadingIcps ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Caricamento ICP…
+            </div>
+          ) : icps.length === 0 ? (
+            <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center space-y-3">
+              <p className="font-medium text-sm">Nessun ICP ancora</p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Costruisci il tuo primo Ideal Customer Profile per iniziare a cercare i prospect giusti.
+              </p>
+              <Button asChild className="bg-primary hover:bg-primary-hover text-primary-foreground">
+                <Link to="/skill/icp-builder">
+                  Costruisci ICP <ChevronRight className="ml-1 h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Quale ICP usare?
+                </label>
+                <Select value={values.icpId || ""} onValueChange={(v) => set("icpId", v)}>
+                  <SelectTrigger className="bg-surface border-border/50 h-11">
+                    <SelectValue placeholder="Seleziona un ICP" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {icps.map((icp) => (
+                      <SelectItem key={icp.id} value={icp.id}>
+                        <span className="flex items-center gap-2">
+                          <span>{icp.name}</span>
+                          {icp.is_default && (
+                            <Badge className="bg-primary/15 text-primary border-0 text-[9px]">default</Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  <Link to="/icps" className="hover:text-primary transition-colors">
+                    Gestisci i tuoi ICP →
+                  </Link>
+                </p>
+              </div>
+              {submitBtn}
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="url" className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground">
+              URL del profilo LinkedIn
+            </label>
+            <Input
+              placeholder="https://www.linkedin.com/in/..."
+              value={values.url || ""}
+              onChange={(e) => set("url", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+            <p className="text-xs text-muted-foreground">
+              Analizziamo il profilo singolo e calcoliamo il fit score con il tuo ICP default.
+            </p>
+          </div>
+          {submitBtn}
+        </TabsContent>
+
+        <TabsContent value="name" className="mt-4">
+          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
+            Ricerca per nome+cognome — disponibile a breve.
+          </div>
+        </TabsContent>
+        <TabsContent value="company" className="mt-4">
+          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
+            Ricerca per azienda — disponibile a breve.
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 function SkillForm({
   skillId,
   onSubmit,
@@ -1311,74 +1484,9 @@ function SkillForm({
     );
   }
   if (skillId === "prospect-finder") {
-    // v3.4.3 (P5): banner informativo se il campo query è stato precompilato da ICP salvato.
-    const hasPrefilledIcp = !!storedIcp && !!values.query;
-    const clearIcp = async () => {
-      // Rimuove da localStorage
-      try {
-        localStorage.removeItem("ember:last_icp");
-      } catch {
-        /* ignore */
-      }
-      // Rimuove anche da DB (merge con tutto raw_profile_data tranne icp_current)
-      if (profile?.raw_profile_data) {
-        const { icp_current, ...rest } = profile.raw_profile_data as any;
-        try {
-          await updateRawProfileData(rest);
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn("[SkillForm] clearIcp DB update failed:", e);
-        }
-      }
-      setStoredIcp(null);
-      set("query", "");
-    };
-    const formatDate = (iso: string) => {
-      try {
-        return new Date(iso).toLocaleString("it-IT", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      } catch {
-        return "";
-      }
-    };
-    return (
-      <div className="space-y-4">
-        {hasPrefilledIcp && storedIcp && (
-          <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-primary mb-0.5">ICP precompilato</p>
-              <p className="text-xs text-muted-foreground">
-                Costruito il {formatDate(storedIcp.generated_at)}
-                {storedIcp.user_input
-                  ? ` · "${storedIcp.user_input.slice(0, 60)}${storedIcp.user_input.length > 60 ? "…" : ""}"`
-                  : ""}
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={clearIcp} className="text-xs hover:text-destructive shrink-0">
-              Rimuovi
-            </Button>
-          </div>
-        )}
-        <Input
-          placeholder="URL LinkedIn del prospect"
-          value={values.url || ""}
-          onChange={(e) => set("url", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary h-11"
-        />
-        <Textarea
-          placeholder="Descrizione ICP o contesto (opzionale)"
-          value={values.query || ""}
-          onChange={(e) => set("query", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary transition-colors"
-          rows={hasPrefilledIcp ? 6 : 2}
-        />
-        {submitBtn}
-      </div>
-    );
+    // v3.7 Pezzo 2A: rimosso il banner "ICP precompilato" + clearIcp.
+    // Nuovo flusso: tab `Per ICP | Per URL | (Per nome) | (Per azienda)`.
+    return <ProspectFinderForm values={values} setValues={setValues} loading={loading} onSubmit={onSubmit} />;
   }
   if (skillId === "outreach-drafter") {
     return (
@@ -1458,6 +1566,10 @@ export default function SkillPage() {
   const skill = SKILLS.find((s) => s.id === skillId);
   const { profile, consumeSkillRun, updateRawProfileData, updateProfile } = useProfile();
   const { logRun } = useSkillRuns();
+  const icpHook = useIcps();
+  // v3.7 Pezzo 2A: riapertura ricerca passata via ?searchId=
+  const reopenSearchId = searchParams.get("searchId");
+  const { data: reopenedSearch } = useSearchById(reopenSearchId);
 
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1517,6 +1629,21 @@ export default function SkillPage() {
     return () => clearTimeout(timer);
   }, [output, targetSection]);
 
+  // v3.7 Pezzo 2A: riapertura ricerca passata via ?searchId= (no API call).
+  useEffect(() => {
+    if (skill?.id !== "prospect-finder") return;
+    if (!reopenSearchId) return;
+    if (!reopenedSearch) return;
+    setOutput({
+      prospects: reopenedSearch.prospects,
+      count: reopenedSearch.prospects.length,
+      count_saved: reopenedSearch.prospects.length,
+      search_id: reopenedSearch.id,
+      _from_history: true,
+    });
+    setLastEffectiveSkillId("prospect-search-harvest");
+  }, [skill?.id, reopenSearchId, reopenedSearch?.id, reopenedSearch]);
+
   if (!skill) {
     return (
       <AppLayout>
@@ -1555,28 +1682,39 @@ export default function SkillPage() {
     );
 
     if (skill.id === "prospect-finder") {
-      const hasUrl = !!(formValues.url && formValues.url.trim().length > 0);
-      if (!hasUrl) {
+      const mode = (formValues.searchMode as string) || (formValues.url ? "url" : "icp");
+
+      if (mode === "icp") {
+        // v3.7 Pezzo 2A: usa l'ICP scelto dal picker (formValues.icpId)
         effectiveSkillId = "prospect-search-harvest";
-        const icpCurrent = (profile.raw_profile_data as any)?.icp_current;
-        const icpStrutturato = icpCurrent?.icp ?? null;
-        const icpPayload =
-          icpStrutturato && typeof icpStrutturato === "object"
-            ? icpStrutturato
-            : formValues.query
-              ? { descrizione: formValues.query }
-              : {};
-        if (!icpPayload || Object.keys(icpPayload).length === 0) {
-          toast.error("Inserisci un URL LinkedIn oppure costruisci prima l'ICP dalla Dashboard.");
+        const pickedIcpId = formValues.icpId;
+        const pickedIcp = icpHook.icps.find((i) => i.id === pickedIcpId) || icpHook.defaultIcp;
+        if (!pickedIcp) {
+          toast.error("Seleziona un ICP. Se non ne hai ancora, costruiscine uno da \"I miei ICP\".");
           setLoading(false);
           return;
         }
         payload = {
           user_id: user.id,
-          icp: icpPayload,
+          icp: pickedIcp.icp_json,
+          icp_id: pickedIcp.id,
+          icp_name: pickedIcp.name,
+          filters_override: pickedIcp.filters_override || null,
           list_name: "",
         };
+        // Best-effort, non blocca
+        icpHook.touchUsed(pickedIcp.id);
+      } else if (mode === "url") {
+        // Per URL: skillId resta 'prospect-finder' (1 scrape singolo + fit_score).
+        // Aggiungiamo l'ICP default per il fit score, se presente.
+        const fallbackIcp = icpHook.defaultIcp?.icp_json ?? {};
+        payload = {
+          user_id: user.id,
+          linkedin_url_target: formValues.url || "",
+          icp: fallbackIcp,
+        };
       }
+      // mode 'name' e 'company' arriveranno in 2B/2C — UI già disabled.
     }
 
     // SkillId è una union literal stretta in ember-types; cast esplicito perché
@@ -1776,9 +1914,18 @@ export default function SkillPage() {
   const showCacheBanner = isAutoProfileWithCache || isIcpBuilderWithCache;
   const hideFormBecauseCache = showCacheBanner;
 
+  const isProspectFinder = skill.id === "prospect-finder";
+
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div
+        className={
+          isProspectFinder
+            ? "max-w-6xl mx-auto grid gap-6 lg:grid-cols-[1fr_320px]"
+            : "max-w-3xl mx-auto space-y-6"
+        }
+      >
+        <div className="space-y-6 min-w-0">
         {/* Header */}
         <div className="flex items-start gap-4 animate-in">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -1889,7 +2036,82 @@ export default function SkillPage() {
             </CardContent>
           </Card>
         )}
+        </div>
+
+        {/* RIGHT RAIL — solo per prospect-finder */}
+        {isProspectFinder && <RecentSearchesRail />}
       </div>
     </AppLayout>
+  );
+}
+
+function RecentSearchesRail() {
+  const { searches, loading } = useRecentSearches(10);
+  return (
+    <aside className="lg:sticky lg:top-6 self-start">
+      <Card className="bg-card/80 border-border/50 backdrop-blur-sm">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HistoryIcon className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">Ricerche recenti</h3>
+            </div>
+            {searches.length > 0 && (
+              <Link
+                to="/searches"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                Vedi tutte
+              </Link>
+            )}
+          </div>
+
+          {loading && (
+            <p className="text-xs text-muted-foreground py-3">Caricamento…</p>
+          )}
+
+          {!loading && searches.length === 0 && (
+            <div className="p-4 rounded-lg border border-dashed border-border/40 text-center">
+              <p className="text-xs text-muted-foreground">
+                Nessuna ricerca ancora. Falla qui sopra.
+              </p>
+            </div>
+          )}
+
+          {!loading && searches.length > 0 && (
+            <div className="space-y-2">
+              {searches.map((s) => (
+                <Link
+                  key={s.id}
+                  to={`/skill/prospect-finder?searchId=${s.id}`}
+                  className="block p-3 rounded-lg bg-surface/40 border border-border/30 hover:border-primary/40 hover:bg-surface/70 transition-all group"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <Badge
+                      variant="outline"
+                      className={`${searchSourceColor(s.source)} text-[9px] border`}
+                    >
+                      {searchSourceLabel(s.source)}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(s.created_at).toLocaleDateString("it-IT", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
+                    {searchSummary(s)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {s.prospect_count} prospect
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </aside>
   );
 }
