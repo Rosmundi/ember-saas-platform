@@ -1335,74 +1335,9 @@ function SkillForm({
     );
   }
   if (skillId === "prospect-finder") {
-    // v3.4.3 (P5): banner informativo se il campo query è stato precompilato da ICP salvato.
-    const hasPrefilledIcp = !!storedIcp && !!values.query;
-    const clearIcp = async () => {
-      // Rimuove da localStorage
-      try {
-        localStorage.removeItem("ember:last_icp");
-      } catch {
-        /* ignore */
-      }
-      // Rimuove anche da DB (merge con tutto raw_profile_data tranne icp_current)
-      if (profile?.raw_profile_data) {
-        const { icp_current, ...rest } = profile.raw_profile_data as any;
-        try {
-          await updateRawProfileData(rest);
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn("[SkillForm] clearIcp DB update failed:", e);
-        }
-      }
-      setStoredIcp(null);
-      set("query", "");
-    };
-    const formatDate = (iso: string) => {
-      try {
-        return new Date(iso).toLocaleString("it-IT", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      } catch {
-        return "";
-      }
-    };
-    return (
-      <div className="space-y-4">
-        {hasPrefilledIcp && storedIcp && (
-          <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-primary mb-0.5">ICP precompilato</p>
-              <p className="text-xs text-muted-foreground">
-                Costruito il {formatDate(storedIcp.generated_at)}
-                {storedIcp.user_input
-                  ? ` · "${storedIcp.user_input.slice(0, 60)}${storedIcp.user_input.length > 60 ? "…" : ""}"`
-                  : ""}
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={clearIcp} className="text-xs hover:text-destructive shrink-0">
-              Rimuovi
-            </Button>
-          </div>
-        )}
-        <Input
-          placeholder="URL LinkedIn del prospect"
-          value={values.url || ""}
-          onChange={(e) => set("url", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary h-11"
-        />
-        <Textarea
-          placeholder="Descrizione ICP o contesto (opzionale)"
-          value={values.query || ""}
-          onChange={(e) => set("query", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary transition-colors"
-          rows={hasPrefilledIcp ? 6 : 2}
-        />
-        {submitBtn}
-      </div>
-    );
+    // v3.7 Pezzo 2A: rimosso il banner "ICP precompilato" + clearIcp.
+    // Nuovo flusso: tab `Per ICP | Per URL | (Per nome) | (Per azienda)`.
+    return <ProspectFinderForm values={values} setValues={setValues} loading={loading} onSubmit={onSubmit} />;
   }
   if (skillId === "outreach-drafter") {
     return (
