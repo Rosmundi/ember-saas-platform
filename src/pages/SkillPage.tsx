@@ -1102,6 +1102,155 @@ function formatIcpForTextarea(icp: any): string {
   return out.join("\n\n");
 }
 
+// ============================================================================
+// ProspectFinderForm (v3.7 Pezzo 2A) — tab multi-mode
+// ============================================================================
+
+type SearchMode = "icp" | "url" | "name" | "company";
+
+function ProspectFinderForm({
+  values,
+  setValues,
+  loading,
+  onSubmit,
+}: {
+  values: Record<string, string>;
+  setValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  loading: boolean;
+  onSubmit: (data: Record<string, string>) => void;
+}) {
+  const { icps, defaultIcp, loading: loadingIcps } = useIcps();
+  const [searchMode, setSearchMode] = useState<SearchMode>(
+    (values.searchMode as SearchMode) || (values.url ? "url" : "icp"),
+  );
+
+  const setMode = (m: SearchMode) => {
+    setSearchMode(m);
+    setValues((prev) => ({ ...prev, searchMode: m }));
+  };
+  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
+
+  useEffect(() => {
+    if (defaultIcp && !values.icpId) {
+      setValues((prev) => ({ ...prev, icpId: defaultIcp.id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultIcp?.id]);
+
+  const submitBtn = (
+    <Button
+      onClick={() => onSubmit({ ...values, searchMode })}
+      disabled={
+        loading ||
+        (searchMode === "icp" && !values.icpId) ||
+        (searchMode === "url" && !values.url)
+      }
+      className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+    >
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+      {loading ? "Ricerca in corso..." : "Trova prospect"}
+    </Button>
+  );
+
+  return (
+    <div className="space-y-4">
+      <Tabs value={searchMode} onValueChange={(v) => setMode(v as SearchMode)}>
+        <TabsList className="grid grid-cols-4 w-full bg-surface/50 border border-border/30">
+          <TabsTrigger value="icp">Per ICP</TabsTrigger>
+          <TabsTrigger value="url">Per URL</TabsTrigger>
+          <TabsTrigger value="name" disabled className="text-muted-foreground">
+            Per nome
+          </TabsTrigger>
+          <TabsTrigger value="company" disabled className="text-muted-foreground">
+            Per azienda
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="icp" className="space-y-4 mt-4">
+          {loadingIcps ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Caricamento ICP…
+            </div>
+          ) : icps.length === 0 ? (
+            <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center space-y-3">
+              <p className="font-medium text-sm">Nessun ICP ancora</p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Costruisci il tuo primo Ideal Customer Profile per iniziare a cercare i prospect giusti.
+              </p>
+              <Button asChild className="bg-primary hover:bg-primary-hover text-primary-foreground">
+                <Link to="/skill/icp-builder">
+                  Costruisci ICP <ChevronRight className="ml-1 h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Quale ICP usare?
+                </label>
+                <Select value={values.icpId || ""} onValueChange={(v) => set("icpId", v)}>
+                  <SelectTrigger className="bg-surface border-border/50 h-11">
+                    <SelectValue placeholder="Seleziona un ICP" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {icps.map((icp) => (
+                      <SelectItem key={icp.id} value={icp.id}>
+                        <span className="flex items-center gap-2">
+                          <span>{icp.name}</span>
+                          {icp.is_default && (
+                            <Badge className="bg-primary/15 text-primary border-0 text-[9px]">default</Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  <Link to="/icps" className="hover:text-primary transition-colors">
+                    Gestisci i tuoi ICP →
+                  </Link>
+                </p>
+              </div>
+              {submitBtn}
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="url" className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground">
+              URL del profilo LinkedIn
+            </label>
+            <Input
+              placeholder="https://www.linkedin.com/in/..."
+              value={values.url || ""}
+              onChange={(e) => set("url", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+            <p className="text-xs text-muted-foreground">
+              Analizziamo il profilo singolo e calcoliamo il fit score con il tuo ICP default.
+            </p>
+          </div>
+          {submitBtn}
+        </TabsContent>
+
+        <TabsContent value="name" className="mt-4">
+          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
+            Ricerca per nome+cognome — disponibile a breve.
+          </div>
+        </TabsContent>
+        <TabsContent value="company" className="mt-4">
+          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
+            Ricerca per azienda — disponibile a breve.
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 function SkillForm({
   skillId,
   onSubmit,
