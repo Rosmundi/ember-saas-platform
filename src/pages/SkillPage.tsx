@@ -1769,8 +1769,31 @@ export default function SkillPage() {
           linkedin_url_target: formValues.url || "",
           icp: fallbackIcp,
         };
+      } else if (mode === "name") {
+        // v3.7.2 Pezzo 2B: ricerca per nome+cognome.
+        // Bypassa l'ICP, va al workflow harvest che switcha sul branch IF (search_mode='name').
+        effectiveSkillId = "prospect-search-harvest";
+        const firstName = (formValues.firstName || "").trim();
+        const lastName = (formValues.lastName || "").trim();
+        if (!firstName || !lastName) {
+          toast.error("Inserisci nome e cognome.");
+          setLoading(false);
+          return;
+        }
+        const locations = (formValues.location || "").trim()
+          ? [(formValues.location as string).trim()]
+          : ["Italy"];
+        payload = {
+          user_id: user.id,
+          search_mode: "name",
+          firstName,
+          lastName,
+          keywords: (formValues.keywords || "").trim(),
+          locations,
+          list_name: "",
+        };
       }
-      // mode 'name' e 'company' arriveranno in 2B/2C — UI già disabled.
+      // mode 'company' arriverà in 2C — UI già disabled.
     }
 
     // SkillId è una union literal stretta in ember-types; cast esplicito perché
