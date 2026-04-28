@@ -1629,6 +1629,21 @@ export default function SkillPage() {
     return () => clearTimeout(timer);
   }, [output, targetSection]);
 
+  // v3.7 Pezzo 2A: riapertura ricerca passata via ?searchId= (no API call).
+  useEffect(() => {
+    if (skill?.id !== "prospect-finder") return;
+    if (!reopenSearchId) return;
+    if (!reopenedSearch) return;
+    setOutput({
+      prospects: reopenedSearch.prospects,
+      count: reopenedSearch.prospects.length,
+      count_saved: reopenedSearch.prospects.length,
+      search_id: reopenedSearch.id,
+      _from_history: true,
+    });
+    setLastEffectiveSkillId("prospect-search-harvest");
+  }, [skill?.id, reopenSearchId, reopenedSearch?.id, reopenedSearch]);
+
   if (!skill) {
     return (
       <AppLayout>
