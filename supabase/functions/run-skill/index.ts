@@ -78,6 +78,7 @@ function buildSearchAuditFromPayload(payload: Record<string, unknown>): {
       icpId: (payload.icp_id as string) ?? null,
       snapshot: {
         search_mode: "company",
+        company_url: payload.company_url ?? "",
         company_name: payload.company_name ?? "",
         company_id: payload.company_id ?? null,
         icp: payload.icp ?? null,
