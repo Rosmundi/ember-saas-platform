@@ -1152,6 +1152,17 @@ function ProspectFinderForm({
     </Button>
   );
 
+  const submitBtnName = (
+    <Button
+      onClick={() => onSubmit({ ...values, searchMode: "name" })}
+      disabled={loading || !values.firstName?.trim() || !values.lastName?.trim()}
+      className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+    >
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+      {loading ? "Ricerca in corso..." : "Trova persone"}
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
       <Tabs value={searchMode} onValueChange={(v) => setMode(v as SearchMode)}>
