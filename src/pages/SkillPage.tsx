@@ -1163,6 +1163,27 @@ function ProspectFinderForm({
     </Button>
   );
 
+  const isValidCompanyUrl = (u: string): boolean => {
+    if (!u) return false;
+    return /^https?:\/\/(www\.)?linkedin\.com\/(company|school|showcase)\//i.test(u.trim());
+  };
+
+  const submitBtnCompany = (
+    <Button
+      onClick={() => onSubmit({ ...values, searchMode: "company" })}
+      disabled={
+        loading ||
+        !isValidCompanyUrl(values.company_url || "") ||
+        !values.icpId ||
+        icps.length === 0
+      }
+      className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+    >
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+      {loading ? "Trovo decisori..." : "Trova decisori"}
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
       <Tabs value={searchMode} onValueChange={(v) => setMode(v as SearchMode)}>
@@ -1170,9 +1191,7 @@ function ProspectFinderForm({
           <TabsTrigger value="icp">Per ICP</TabsTrigger>
           <TabsTrigger value="url">Per URL</TabsTrigger>
           <TabsTrigger value="name">Per nome</TabsTrigger>
-          <TabsTrigger value="company" disabled className="text-muted-foreground">
-            Per azienda
-          </TabsTrigger>
+          <TabsTrigger value="company">Per azienda</TabsTrigger>
         </TabsList>
 
         <TabsContent value="icp" className="space-y-4 mt-4">
@@ -1297,10 +1316,68 @@ function ProspectFinderForm({
           </div>
           {submitBtnName}
         </TabsContent>
-        <TabsContent value="company" className="mt-4">
-          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
-            Ricerca per azienda — disponibile a breve.
+        <TabsContent value="company" className="space-y-4 mt-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              URL LinkedIn dell'azienda <span className="text-destructive">*</span>
+            </label>
+            <Input
+              placeholder="https://www.linkedin.com/company/nome-azienda/"
+              value={values.company_url || ""}
+              onChange={(e) => set("company_url", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Vai sulla pagina LinkedIn dell'azienda e copia l'URL dalla barra del browser.
+            </p>
           </div>
+
+          {loadingIcps ? (
+            <div className="text-sm text-muted-foreground py-2">
+              <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+              Caricamento ICP…
+            </div>
+          ) : icps.length === 0 ? (
+            <div className="p-4 rounded-xl bg-warning/10 border border-warning/30 text-sm">
+              <p className="font-medium mb-1">Serve almeno un ICP</p>
+              <p className="text-muted-foreground mb-3">
+                I decisori vengono filtrati in base ai ruoli del tuo ICP. Costruiscine uno prima di cercare per azienda.
+              </p>
+              <Button asChild size="sm" className="bg-primary hover:bg-primary-hover text-primary-foreground">
+                <Link to="/skill/icp-builder?new=1">
+                  Costruisci ICP <ChevronRight className="ml-1 h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Filtra ruoli con questo ICP
+              </label>
+              <Select value={values.icpId || ""} onValueChange={(v) => set("icpId", v)}>
+                <SelectTrigger className="bg-surface border-border/50 h-11">
+                  <SelectValue placeholder="Seleziona un ICP" />
+                </SelectTrigger>
+                <SelectContent>
+                  {icps.map((icp) => (
+                    <SelectItem key={icp.id} value={icp.id}>
+                      <span className="flex items-center gap-2">
+                        <span>{icp.name}</span>
+                        {icp.is_default && (
+                          <Badge className="bg-primary/15 text-primary border-0 text-[9px]">default</Badge>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                I ruoli (CEO, Direttore, ecc.) e la seniority vengono presi da questo ICP. L'azienda fa da filtro extra.
+              </p>
+            </div>
+          )}
+
+          {submitBtnCompany}
         </TabsContent>
       </Tabs>
     </div>
@@ -1792,8 +1869,33 @@ export default function SkillPage() {
           locations,
           list_name: "",
         };
+      } else if (mode === "company") {
+        // v3.7.3 Pezzo 2C: ricerca decisori di un'azienda.
+        effectiveSkillId = "prospect-search-harvest";
+        const companyUrl = (formValues.company_url || "").trim();
+        if (!/^https?:\/\/(www\.)?linkedin\.com\/(company|school|showcase)\//i.test(companyUrl)) {
+          toast.error("Incolla un URL LinkedIn azienda valido (https://www.linkedin.com/company/...).");
+          setLoading(false);
+          return;
+        }
+        const pickedIcpId = formValues.icpId;
+        const pickedIcp = icpHook.icps.find((i) => i.id === pickedIcpId) || icpHook.defaultIcp;
+        if (!pickedIcp) {
+          toast.error("Seleziona un ICP per filtrare i ruoli dei decisori.");
+          setLoading(false);
+          return;
+        }
+        payload = {
+          user_id: user.id,
+          search_mode: "company",
+          company_url: companyUrl,
+          icp: pickedIcp.icp_json,
+          icp_id: pickedIcp.id,
+          icp_name: pickedIcp.name,
+          list_name: "",
+        };
+        icpHook.touchUsed(pickedIcp.id);
       }
-      // mode 'company' arriverà in 2C — UI già disabled.
     }
 
     // SkillId è una union literal stretta in ember-types; cast esplicito perché
