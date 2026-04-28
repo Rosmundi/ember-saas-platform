@@ -1566,6 +1566,10 @@ export default function SkillPage() {
   const skill = SKILLS.find((s) => s.id === skillId);
   const { profile, consumeSkillRun, updateRawProfileData, updateProfile } = useProfile();
   const { logRun } = useSkillRuns();
+  const icpHook = useIcps();
+  // v3.7 Pezzo 2A: riapertura ricerca passata via ?searchId=
+  const reopenSearchId = searchParams.get("searchId");
+  const { data: reopenedSearch } = useSearchById(reopenSearchId);
 
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1663,28 +1667,39 @@ export default function SkillPage() {
     );
 
     if (skill.id === "prospect-finder") {
-      const hasUrl = !!(formValues.url && formValues.url.trim().length > 0);
-      if (!hasUrl) {
+      const mode = (formValues.searchMode as string) || (formValues.url ? "url" : "icp");
+
+      if (mode === "icp") {
+        // v3.7 Pezzo 2A: usa l'ICP scelto dal picker (formValues.icpId)
         effectiveSkillId = "prospect-search-harvest";
-        const icpCurrent = (profile.raw_profile_data as any)?.icp_current;
-        const icpStrutturato = icpCurrent?.icp ?? null;
-        const icpPayload =
-          icpStrutturato && typeof icpStrutturato === "object"
-            ? icpStrutturato
-            : formValues.query
-              ? { descrizione: formValues.query }
-              : {};
-        if (!icpPayload || Object.keys(icpPayload).length === 0) {
-          toast.error("Inserisci un URL LinkedIn oppure costruisci prima l'ICP dalla Dashboard.");
+        const pickedIcpId = formValues.icpId;
+        const pickedIcp = icpHook.icps.find((i) => i.id === pickedIcpId) || icpHook.defaultIcp;
+        if (!pickedIcp) {
+          toast.error("Seleziona un ICP. Se non ne hai ancora, costruiscine uno da \"I miei ICP\".");
           setLoading(false);
           return;
         }
         payload = {
           user_id: user.id,
-          icp: icpPayload,
+          icp: pickedIcp.icp_json,
+          icp_id: pickedIcp.id,
+          icp_name: pickedIcp.name,
+          filters_override: pickedIcp.filters_override || null,
           list_name: "",
         };
+        // Best-effort, non blocca
+        icpHook.touchUsed(pickedIcp.id);
+      } else if (mode === "url") {
+        // Per URL: skillId resta 'prospect-finder' (1 scrape singolo + fit_score).
+        // Aggiungiamo l'ICP default per il fit score, se presente.
+        const fallbackIcp = icpHook.defaultIcp?.icp_json ?? {};
+        payload = {
+          user_id: user.id,
+          linkedin_url_target: formValues.url || "",
+          icp: fallbackIcp,
+        };
       }
+      // mode 'name' e 'company' arriveranno in 2B/2C — UI già disabled.
     }
 
     // SkillId è una union literal stretta in ember-types; cast esplicito perché
