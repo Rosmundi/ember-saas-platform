@@ -263,6 +263,7 @@ export type Database = {
           full_data: Json | null
           id: string
           linkedin_url: string
+          search_id: string | null
           short_data: Json
           source_search_at: string
           updated_at: string
@@ -274,6 +275,7 @@ export type Database = {
           full_data?: Json | null
           id?: string
           linkedin_url: string
+          search_id?: string | null
           short_data: Json
           source_search_at?: string
           updated_at?: string
@@ -285,12 +287,68 @@ export type Database = {
           full_data?: Json | null
           id?: string
           linkedin_url?: string
+          search_id?: string | null
           short_data?: Json
           source_search_at?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "prospects_search_id_fkey"
+            columns: ["search_id"]
+            isOneToOne: false
+            referencedRelation: "searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      searches: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          icp_id: string | null
+          id: string
+          prospect_count: number
+          query_snapshot: Json
+          source: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          icp_id?: string | null
+          id?: string
+          prospect_count?: number
+          query_snapshot?: Json
+          source?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          icp_id?: string | null
+          id?: string
+          prospect_count?: number
+          query_snapshot?: Json
+          source?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "searches_icp_id_fkey"
+            columns: ["icp_id"]
+            isOneToOne: false
+            referencedRelation: "icps"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       skill_runs: {
         Row: {
