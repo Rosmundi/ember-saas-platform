@@ -1,4 +1,4 @@
-// src/pages/SkillPage.tsx — v3.4: cache analisi profilo + deep-link sezione + rigenera per sezione
+// src/pages/SkillPage.tsx — v3.7 Pezzo 2A: picker ICP + tab multi-mode + right rail ricerche
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -6,6 +6,14 @@ import { SKILLS, canUseSkill } from "@/lib/ember-types";
 import { callSkill, callRegenerateSection, emberErrorMessage } from "@/lib/ember-api";
 import { useProfile } from "@/hooks/useProfile";
 import { useSkillRuns } from "@/hooks/useSkillRuns";
+import { useIcps } from "@/hooks/useIcps";
+import {
+  useRecentSearches,
+  useSearchById,
+  searchSourceLabel,
+  searchSourceColor,
+  searchSummary,
+} from "@/hooks/useSearches";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SkillIcon } from "@/components/SkillIcon";
 import { ScoreBadge } from "@/components/ScoreBadge";
 // v3.6.1: card prospect "rich" per il risultato di prospect-search-harvest.
@@ -28,6 +37,8 @@ import {
   Sparkles,
   AlertTriangle,
   Wand2,
+  History as HistoryIcon,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 
