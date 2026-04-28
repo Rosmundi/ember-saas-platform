@@ -1245,10 +1245,57 @@ function ProspectFinderForm({
           {submitBtn}
         </TabsContent>
 
-        <TabsContent value="name" className="mt-4">
-          <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
-            Ricerca per nome+cognome — disponibile a breve.
+        <TabsContent value="name" className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Nome <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Mario"
+                value={values.firstName || ""}
+                onChange={(e) => set("firstName", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary h-11"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Cognome <span className="text-destructive">*</span>
+              </label>
+              <Input
+                placeholder="Rossi"
+                value={values.lastName || ""}
+                onChange={(e) => set("lastName", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary h-11"
+              />
+            </div>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Parole chiave <span className="text-muted-foreground/60">(opzionale — per filtrare per ruolo o competenza)</span>
+            </label>
+            <Input
+              placeholder="es. CEO, marketing, automation"
+              value={values.keywords || ""}
+              onChange={(e) => set("keywords", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Località <span className="text-muted-foreground/60">(opzionale — default: Italia)</span>
+            </label>
+            <Input
+              placeholder="es. Milano, Lombardia, Italia"
+              value={values.location || ""}
+              onChange={(e) => set("location", e.target.value)}
+              className="bg-surface border-border/50 focus:border-primary h-11"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Suggerimento: usa la forma "Città, Regione, Italia" per risultati più precisi.
+            </p>
+          </div>
+          {submitBtnName}
         </TabsContent>
         <TabsContent value="company" className="mt-4">
           <div className="p-6 rounded-xl border border-dashed border-border/40 bg-surface/30 text-center text-sm text-muted-foreground">
