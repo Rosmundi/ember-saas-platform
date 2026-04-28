@@ -827,26 +827,39 @@ function SkillOutput({
     const countSaved =
       (data.count_saved as number | undefined) ?? (data.count as number | undefined) ?? prospects.length;
     const remainingToday = ((data as any).quota_consumed?.remaining_today ?? null) as number | null;
-    if (!prospects.length) {
-      return (
-        <div className="text-center py-8 animate-in">
-          <p className="text-sm text-muted-foreground">
-            Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
-          </p>
-        </div>
-      );
-    }
+    const fromHistory = (data as any)._from_history === true;
     return (
       <div className="space-y-4 animate-in">
-        <div className="text-sm text-muted-foreground">
-          Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
-          {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
-        </div>
-        <div className="grid gap-3">
-          {prospects.map((p, i) => (
-            <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
-          ))}
-        </div>
+        {fromHistory && (
+          <div className="flex items-center justify-between gap-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <HistoryIcon className="h-4 w-4 text-blue-400 shrink-0" />
+              <span>Stai vedendo una ricerca passata. Nessuna quota consumata.</span>
+            </div>
+            <Button asChild size="sm" variant="outline" className="border-border/50">
+              <Link to="/skill/prospect-finder">Nuova ricerca</Link>
+            </Button>
+          </div>
+        )}
+        {!prospects.length ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">
+              Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-muted-foreground">
+              Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
+              {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
+            </div>
+            <div className="grid gap-3">
+              {prospects.map((p, i) => (
+                <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
     );
   }
