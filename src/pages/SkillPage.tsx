@@ -488,6 +488,92 @@ function AutoProfileSetupOutput({
   );
 }
 
+// ============ FILTERS USED CARD (v3.7.4) ============
+// Mappature per render leggibile dei filtri harvestapi
+const SENIORITY_LABELS: Record<string, string> = {
+  "100": "Owner", "110": "Partner", "120": "C-Level", "130": "VP",
+  "140": "Director", "200": "Manager", "210": "Senior", "220": "Entry",
+};
+const HEADCOUNT_LABELS: Record<string, string> = {
+  A: "1-10", B: "11-50", C: "51-200", D: "201-500",
+  E: "501-1000", F: "1001-5000", G: "5001-10000",
+  H: "10001+", I: "10001+",
+};
+const INDUSTRY_LABELS: Record<string, string> = {
+  "4": "Software/SaaS", "11": "Consulenza", "14": "Healthcare",
+  "15": "Pharma", "23": "Food & Beverages", "27": "Retail",
+  "43": "Financial Services", "44": "Real Estate", "48": "Construction",
+  "53": "Automotive", "54": "Metallurgia", "59": "Energy",
+  "67": "Education", "80": "Marketing & Adv", "96": "Packaging",
+  "116": "Logistics", "117": "Plastics & Rubber", "135": "Manufacturing",
+  "147": "Industrial Automation",
+};
+
+function FiltersUsedCard({
+  filters,
+  mode,
+  compact = false,
+}: {
+  filters: Record<string, unknown>;
+  mode: string;
+  compact?: boolean;
+}) {
+  const f = filters as any;
+  const rows: Array<{ label: string; value: string }> = [];
+
+  if (mode === "name") {
+    if (f.firstName) rows.push({ label: "Nome", value: f.firstName });
+    if (f.lastName) rows.push({ label: "Cognome", value: f.lastName });
+    if (f.keywords) rows.push({ label: "Parole chiave", value: f.keywords });
+  } else {
+    if (Array.isArray(f.currentJobTitles) && f.currentJobTitles.length) {
+      rows.push({ label: "Ruoli", value: f.currentJobTitles.join(", ") });
+    }
+    if (Array.isArray(f.industryIds) && f.industryIds.length) {
+      const labels = f.industryIds.map((id: string) => INDUSTRY_LABELS[id] || id);
+      rows.push({ label: "Settori", value: labels.join(", ") });
+    }
+    if (Array.isArray(f.seniorityLevels) && f.seniorityLevels.length) {
+      const labels = f.seniorityLevels.map((s: string) => SENIORITY_LABELS[s] || s);
+      rows.push({ label: "Seniority", value: labels.join(", ") });
+    }
+    if (Array.isArray(f.companyHeadcount) && f.companyHeadcount.length) {
+      const labels = f.companyHeadcount.map((h: string) => HEADCOUNT_LABELS[h] || h);
+      rows.push({ label: "Dipendenti", value: labels.join(", ") });
+    }
+    if (mode === "company" && Array.isArray(f.currentCompanies) && f.currentCompanies.length) {
+      rows.push({ label: "Azienda ID", value: f.currentCompanies.join(", ") });
+    }
+  }
+  if (Array.isArray(f.locations) && f.locations.length) {
+    rows.push({ label: "Località", value: f.locations.join(", ") });
+  }
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground italic">Nessun filtro applicato (ricerca aperta)</p>
+    );
+  }
+
+  return (
+    <Card className={compact ? "bg-surface/30 border-border/30" : "bg-surface/50 border-border/30"}>
+      <CardContent className={compact ? "p-3 space-y-1.5" : "p-4 space-y-2"}>
+        {!compact && (
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+            Filtri usati nella ricerca
+          </p>
+        )}
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="text-muted-foreground min-w-[80px]">{r.label}:</span>
+            <span className="font-medium flex-1 break-words">{r.value}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ============ SKILL OUTPUT DISPATCHER ============
 
 function SkillOutput({
@@ -828,6 +914,48 @@ function SkillOutput({
       (data.count_saved as number | undefined) ?? (data.count as number | undefined) ?? prospects.length;
     const remainingToday = ((data as any).quota_consumed?.remaining_today ?? null) as number | null;
     const fromHistory = (data as any)._from_history === true;
+    const searchMode = (data as any).search_mode as string | undefined;
+    const filtersUsed = (data as any).filters_used as Record<string, unknown> | undefined;
+    const hint = (data as any).hint as string | null | undefined;
+
+    // Empty state con hint contestuale + filtri usati per debug
+    if (!prospects.length) {
+      return (
+        <div className="space-y-4 animate-in">
+          {fromHistory && (
+            <div className="flex items-center justify-between gap-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-sm">
+                <HistoryIcon className="h-4 w-4 text-blue-400 shrink-0" />
+                <span>Stai vedendo una ricerca passata. Nessuna quota consumata.</span>
+              </div>
+              <Button asChild size="sm" variant="outline" className="border-border/50">
+                <Link to="/skill/prospect-finder">Nuova ricerca</Link>
+              </Button>
+            </div>
+          )}
+          <div className="p-5 rounded-xl bg-warning/5 border border-warning/30 space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-medium text-sm">Nessun prospect trovato</p>
+                <p className="text-sm text-muted-foreground">
+                  {hint || "I filtri sono troppo stretti. Prova ad allargarli."}
+                </p>
+                {!fromHistory && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ✓ Nessuna quota consumata. Puoi riprovare con filtri diversi.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          {filtersUsed && Object.keys(filtersUsed).length > 0 && (
+            <FiltersUsedCard filters={filtersUsed} mode={searchMode || "icp"} />
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4 animate-in">
         {fromHistory && (
@@ -841,25 +969,25 @@ function SkillOutput({
             </Button>
           </div>
         )}
-        {!prospects.length ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">
-              Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
-            </p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-muted-foreground">
+            Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
+            {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
           </div>
-        ) : (
-          <>
-            <div className="text-sm text-muted-foreground">
-              Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
-              {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
-            </div>
-            <div className="grid gap-3">
-              {prospects.map((p, i) => (
-                <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
-              ))}
-            </div>
-          </>
-        )}
+          {filtersUsed && Object.keys(filtersUsed).length > 0 && (
+            <details className="text-xs text-muted-foreground cursor-pointer">
+              <summary className="hover:text-primary transition-colors">Vedi filtri usati</summary>
+              <div className="mt-2">
+                <FiltersUsedCard filters={filtersUsed} mode={searchMode || "icp"} compact />
+              </div>
+            </details>
+          )}
+        </div>
+        <div className="grid gap-3">
+          {prospects.map((p, i) => (
+            <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -1305,13 +1433,14 @@ function ProspectFinderForm({
               Località <span className="text-muted-foreground/60">(opzionale — default: Italia)</span>
             </label>
             <Input
-              placeholder="es. Milano, Lombardia, Italia"
+              placeholder="es. Italia / Milano / Forlì"
               value={values.location || ""}
               onChange={(e) => set("location", e.target.value)}
               className="bg-surface border-border/50 focus:border-primary h-11"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Suggerimento: usa la forma "Città, Regione, Italia" per risultati più precisi.
+              Puoi scrivere solo la città ("Forlì") oppure paese intero ("Italia"). Il sistema completa automaticamente con ", Italy" se manca.
+              Per ricerche più ampie, lascia vuoto.
             </p>
           </div>
           {submitBtnName}
