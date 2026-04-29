@@ -828,6 +828,48 @@ function SkillOutput({
       (data.count_saved as number | undefined) ?? (data.count as number | undefined) ?? prospects.length;
     const remainingToday = ((data as any).quota_consumed?.remaining_today ?? null) as number | null;
     const fromHistory = (data as any)._from_history === true;
+    const searchMode = (data as any).search_mode as string | undefined;
+    const filtersUsed = (data as any).filters_used as Record<string, unknown> | undefined;
+    const hint = (data as any).hint as string | null | undefined;
+
+    // Empty state con hint contestuale + filtri usati per debug
+    if (!prospects.length) {
+      return (
+        <div className="space-y-4 animate-in">
+          {fromHistory && (
+            <div className="flex items-center justify-between gap-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-sm">
+                <HistoryIcon className="h-4 w-4 text-blue-400 shrink-0" />
+                <span>Stai vedendo una ricerca passata. Nessuna quota consumata.</span>
+              </div>
+              <Button asChild size="sm" variant="outline" className="border-border/50">
+                <Link to="/skill/prospect-finder">Nuova ricerca</Link>
+              </Button>
+            </div>
+          )}
+          <div className="p-5 rounded-xl bg-warning/5 border border-warning/30 space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-medium text-sm">Nessun prospect trovato</p>
+                <p className="text-sm text-muted-foreground">
+                  {hint || "I filtri sono troppo stretti. Prova ad allargarli."}
+                </p>
+                {!fromHistory && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ✓ Nessuna quota consumata. Puoi riprovare con filtri diversi.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          {filtersUsed && Object.keys(filtersUsed).length > 0 && (
+            <FiltersUsedCard filters={filtersUsed} mode={searchMode || "icp"} />
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4 animate-in">
         {fromHistory && (
@@ -841,25 +883,25 @@ function SkillOutput({
             </Button>
           </div>
         )}
-        {!prospects.length ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">
-              Nessun prospect trovato per questo ICP. Prova ad allargare i criteri.
-            </p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-muted-foreground">
+            Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
+            {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
           </div>
-        ) : (
-          <>
-            <div className="text-sm text-muted-foreground">
-              Trovati <span className="text-foreground font-medium">{countSaved}</span> prospect.
-              {remainingToday != null && <> · {remainingToday} search rimaste oggi.</>}
-            </div>
-            <div className="grid gap-3">
-              {prospects.map((p, i) => (
-                <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
-              ))}
-            </div>
-          </>
-        )}
+          {filtersUsed && Object.keys(filtersUsed).length > 0 && (
+            <details className="text-xs text-muted-foreground cursor-pointer">
+              <summary className="hover:text-primary transition-colors">Vedi filtri usati</summary>
+              <div className="mt-2">
+                <FiltersUsedCard filters={filtersUsed} mode={searchMode || "icp"} compact />
+              </div>
+            </details>
+          )}
+        </div>
+        <div className="grid gap-3">
+          {prospects.map((p, i) => (
+            <ProspectCard key={p.id || p.linkedin_url || i} prospect={p} />
+          ))}
+        </div>
       </div>
     );
   }
