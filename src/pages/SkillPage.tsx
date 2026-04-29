@@ -488,6 +488,92 @@ function AutoProfileSetupOutput({
   );
 }
 
+// ============ FILTERS USED CARD (v3.7.4) ============
+// Mappature per render leggibile dei filtri harvestapi
+const SENIORITY_LABELS: Record<string, string> = {
+  "100": "Owner", "110": "Partner", "120": "C-Level", "130": "VP",
+  "140": "Director", "200": "Manager", "210": "Senior", "220": "Entry",
+};
+const HEADCOUNT_LABELS: Record<string, string> = {
+  A: "1-10", B: "11-50", C: "51-200", D: "201-500",
+  E: "501-1000", F: "1001-5000", G: "5001-10000",
+  H: "10001+", I: "10001+",
+};
+const INDUSTRY_LABELS: Record<string, string> = {
+  "4": "Software/SaaS", "11": "Consulenza", "14": "Healthcare",
+  "15": "Pharma", "23": "Food & Beverages", "27": "Retail",
+  "43": "Financial Services", "44": "Real Estate", "48": "Construction",
+  "53": "Automotive", "54": "Metallurgia", "59": "Energy",
+  "67": "Education", "80": "Marketing & Adv", "96": "Packaging",
+  "116": "Logistics", "117": "Plastics & Rubber", "135": "Manufacturing",
+  "147": "Industrial Automation",
+};
+
+function FiltersUsedCard({
+  filters,
+  mode,
+  compact = false,
+}: {
+  filters: Record<string, unknown>;
+  mode: string;
+  compact?: boolean;
+}) {
+  const f = filters as any;
+  const rows: Array<{ label: string; value: string }> = [];
+
+  if (mode === "name") {
+    if (f.firstName) rows.push({ label: "Nome", value: f.firstName });
+    if (f.lastName) rows.push({ label: "Cognome", value: f.lastName });
+    if (f.keywords) rows.push({ label: "Parole chiave", value: f.keywords });
+  } else {
+    if (Array.isArray(f.currentJobTitles) && f.currentJobTitles.length) {
+      rows.push({ label: "Ruoli", value: f.currentJobTitles.join(", ") });
+    }
+    if (Array.isArray(f.industryIds) && f.industryIds.length) {
+      const labels = f.industryIds.map((id: string) => INDUSTRY_LABELS[id] || id);
+      rows.push({ label: "Settori", value: labels.join(", ") });
+    }
+    if (Array.isArray(f.seniorityLevels) && f.seniorityLevels.length) {
+      const labels = f.seniorityLevels.map((s: string) => SENIORITY_LABELS[s] || s);
+      rows.push({ label: "Seniority", value: labels.join(", ") });
+    }
+    if (Array.isArray(f.companyHeadcount) && f.companyHeadcount.length) {
+      const labels = f.companyHeadcount.map((h: string) => HEADCOUNT_LABELS[h] || h);
+      rows.push({ label: "Dipendenti", value: labels.join(", ") });
+    }
+    if (mode === "company" && Array.isArray(f.currentCompanies) && f.currentCompanies.length) {
+      rows.push({ label: "Azienda ID", value: f.currentCompanies.join(", ") });
+    }
+  }
+  if (Array.isArray(f.locations) && f.locations.length) {
+    rows.push({ label: "Località", value: f.locations.join(", ") });
+  }
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground italic">Nessun filtro applicato (ricerca aperta)</p>
+    );
+  }
+
+  return (
+    <Card className={compact ? "bg-surface/30 border-border/30" : "bg-surface/50 border-border/30"}>
+      <CardContent className={compact ? "p-3 space-y-1.5" : "p-4 space-y-2"}>
+        {!compact && (
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+            Filtri usati nella ricerca
+          </p>
+        )}
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="text-muted-foreground min-w-[80px]">{r.label}:</span>
+            <span className="font-medium flex-1 break-words">{r.value}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ============ SKILL OUTPUT DISPATCHER ============
 
 function SkillOutput({
