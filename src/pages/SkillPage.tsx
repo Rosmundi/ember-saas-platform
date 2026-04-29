@@ -1433,13 +1433,14 @@ function ProspectFinderForm({
               Località <span className="text-muted-foreground/60">(opzionale — default: Italia)</span>
             </label>
             <Input
-              placeholder="es. Milano, Lombardia, Italia"
+              placeholder="es. Italia / Milano / Forlì"
               value={values.location || ""}
               onChange={(e) => set("location", e.target.value)}
               className="bg-surface border-border/50 focus:border-primary h-11"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Suggerimento: usa la forma "Città, Regione, Italia" per risultati più precisi.
+              Puoi scrivere solo la città ("Forlì") oppure paese intero ("Italia"). Il sistema completa automaticamente con ", Italy" se manca.
+              Per ricerche più ampie, lascia vuoto.
             </p>
           </div>
           {submitBtnName}
