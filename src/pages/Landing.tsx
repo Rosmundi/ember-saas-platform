@@ -75,7 +75,10 @@ export default function Landing() {
 
           <ScrollReveal delay={100}>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] mb-6 bg-gradient-to-b from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
-              Il copilot LinkedIn per professionisti e PMI italiane
+              Trasforma LinkedIn nel tuo canale di crescita.
+              <span className="block text-3xl md:text-4xl lg:text-5xl font-bold mt-4 text-muted-foreground">
+                Ember è il copilot dei professionisti che non hanno tempo da perdere.
+              </span>
             </h1>
           </ScrollReveal>
 
