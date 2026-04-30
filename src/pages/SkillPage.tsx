@@ -488,17 +488,9 @@ function AutoProfileSetupOutput({
   );
 }
 
-// ============ FILTERS USED CARD (v3.7.4) ============
-// Mappature per render leggibile dei filtri harvestapi
-const SENIORITY_LABELS: Record<string, string> = {
-  "100": "Owner", "110": "Partner", "120": "C-Level", "130": "VP",
-  "140": "Director", "200": "Manager", "210": "Senior", "220": "Entry",
-};
-const HEADCOUNT_LABELS: Record<string, string> = {
-  A: "1-10", B: "11-50", C: "51-200", D: "201-500",
-  E: "501-1000", F: "1001-5000", G: "5001-10000",
-  H: "10001+", I: "10001+",
-};
+// ============ FILTERS USED CARD (v3.7.7) ============
+// Mappature per render leggibile dei filtri harvestapi (schema Apify 2026).
+// RIMOSSI: SENIORITY_LABELS, HEADCOUNT_LABELS (parametri non più nello schema API).
 const INDUSTRY_LABELS: Record<string, string> = {
   "4": "Software/SaaS", "11": "Consulenza", "14": "Healthcare",
   "15": "Pharma", "23": "Food & Beverages", "27": "Retail",
@@ -521,30 +513,32 @@ function FiltersUsedCard({
   const f = filters as any;
   const rows: Array<{ label: string; value: string }> = [];
 
-  if (mode === "name") {
-    if (f.firstName) rows.push({ label: "Nome", value: f.firstName });
-    if (f.lastName) rows.push({ label: "Cognome", value: f.lastName });
-    if (f.keywords) rows.push({ label: "Parole chiave", value: f.keywords });
-  } else {
-    if (Array.isArray(f.currentJobTitles) && f.currentJobTitles.length) {
-      rows.push({ label: "Ruoli", value: f.currentJobTitles.join(", ") });
-    }
-    if (Array.isArray(f.industryIds) && f.industryIds.length) {
-      const labels = f.industryIds.map((id: string) => INDUSTRY_LABELS[id] || id);
-      rows.push({ label: "Settori", value: labels.join(", ") });
-    }
-    if (Array.isArray(f.seniorityLevels) && f.seniorityLevels.length) {
-      const labels = f.seniorityLevels.map((s: string) => SENIORITY_LABELS[s] || s);
-      rows.push({ label: "Seniority", value: labels.join(", ") });
-    }
-    if (Array.isArray(f.companyHeadcount) && f.companyHeadcount.length) {
-      const labels = f.companyHeadcount.map((h: string) => HEADCOUNT_LABELS[h] || h);
-      rows.push({ label: "Dipendenti", value: labels.join(", ") });
-    }
-    if (mode === "company" && Array.isArray(f.currentCompanies) && f.currentCompanies.length) {
-      rows.push({ label: "Azienda ID", value: f.currentCompanies.join(", ") });
-    }
+  // searchQuery (per name-mode, free text)
+  if (f.searchQuery && String(f.searchQuery).trim()) {
+    rows.push({ label: "Ricerca libera", value: String(f.searchQuery) });
   }
+
+  // currentJobTitles
+  if (Array.isArray(f.currentJobTitles) && f.currentJobTitles.length) {
+    rows.push({ label: "Ruoli", value: f.currentJobTitles.join(", ") });
+  }
+
+  // industryIds → label leggibili
+  if (Array.isArray(f.industryIds) && f.industryIds.length) {
+    const labels = f.industryIds.map((id: string) => INDUSTRY_LABELS[id] || id);
+    rows.push({ label: "Settori", value: labels.join(", ") });
+  }
+
+  // currentCompanyLinkedinUrls → mostra solo lo slug per leggibilità
+  if (Array.isArray(f.currentCompanyLinkedinUrls) && f.currentCompanyLinkedinUrls.length) {
+    const slugs = f.currentCompanyLinkedinUrls.map((url: string) => {
+      const m = String(url).match(/linkedin\.com\/(?:company|school)\/([^/?#]+)/i);
+      return m ? m[1] : url;
+    });
+    rows.push({ label: "Aziende", value: slugs.join(", ") });
+  }
+
+  // locations
   if (Array.isArray(f.locations) && f.locations.length) {
     rows.push({ label: "Località", value: f.locations.join(", ") });
   }
