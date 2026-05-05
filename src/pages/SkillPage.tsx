@@ -2375,7 +2375,10 @@ export default function SkillPage() {
   // Per auto-profile-setup con cache: NON mostrare il form, solo risultato + Rianalizza
   const isAutoProfileWithCache = skill.id === "auto-profile-setup" && loadedFromCache && !forceNewRun;
   // v3.4.3 (P5): stesso comportamento per icp-builder. Se c'è un ICP in DB, nascondi il form e mostra "Rianalizza".
-  const isIcpBuilderWithCache = skill.id === "icp-builder" && loadedFromCache && !forceNewRun;
+  // v3.7.11 fix: in modalità modifica (?icpId=...) il form DEVE restare visibile, altrimenti l'utente
+  // non può cambiare nome/zone (le pill regioni sembrano "non cliccabili" perché il form non viene renderizzato).
+  const isEditingExistingIcp = skill.id === "icp-builder" && !!searchParams.get("icpId");
+  const isIcpBuilderWithCache = skill.id === "icp-builder" && loadedFromCache && !forceNewRun && !isEditingExistingIcp;
   const showCacheBanner = isAutoProfileWithCache || isIcpBuilderWithCache;
   const hideFormBecauseCache = showCacheBanner;
 
