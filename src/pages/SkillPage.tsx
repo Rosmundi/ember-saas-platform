@@ -42,6 +42,34 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+// ============================================================================
+// v3.7.10 — Regioni IT mappate alle stringhe accettate da harvestapi/linkedin-profile-search.
+// LinkedIn standardizza in inglese le regioni italiane. Mappa Verona/Milano/etc. → "Lombardy, Italy" etc.
+// ============================================================================
+const REGIONI_IT: Array<{ value: string; label: string }> = [
+  { value: "Italy",                          label: "Tutta Italia" },
+  { value: "Lombardy, Italy",                label: "Lombardia" },
+  { value: "Veneto, Italy",                  label: "Veneto" },
+  { value: "Latium, Italy",                  label: "Lazio" },
+  { value: "Piedmont, Italy",                label: "Piemonte" },
+  { value: "Emilia-Romagna, Italy",          label: "Emilia-Romagna" },
+  { value: "Tuscany, Italy",                 label: "Toscana" },
+  { value: "Sicily, Italy",                  label: "Sicilia" },
+  { value: "Campania, Italy",                label: "Campania" },
+  { value: "Liguria, Italy",                 label: "Liguria" },
+  { value: "Friuli-Venezia Giulia, Italy",   label: "Friuli-Venezia Giulia" },
+  { value: "Marche, Italy",                  label: "Marche" },
+  { value: "Trentino-Alto Adige, Italy",     label: "Trentino-Alto Adige" },
+  { value: "Sardinia, Italy",                label: "Sardegna" },
+  { value: "Calabria, Italy",                label: "Calabria" },
+  { value: "Apulia, Italy",                  label: "Puglia" },
+  { value: "Abruzzo, Italy",                 label: "Abruzzo" },
+  { value: "Umbria, Italy",                  label: "Umbria" },
+  { value: "Basilicata, Italy",              label: "Basilicata" },
+  { value: "Molise, Italy",                  label: "Molise" },
+  { value: "Aosta Valley, Italy",            label: "Valle d'Aosta" },
+];
+
 // ============ UTILITY COMPONENTS ============
 
 function CopyButton({ text }: { text: string }) {
@@ -1601,8 +1629,12 @@ function SkillForm({
     // v3.4.2 fix (P1): precompila ICP builder con target dal profilo analizzato.
     // Priorità: query string ?description= > raw_profile_data.target_buyer.
     if (skillId === "icp-builder") {
+      // v3.7.10: precompila name e descrizione. Se ?icpId=X, name/description verranno
+      // caricati da DB nell'useEffect successivo. Qui inizializziamo solo da query string.
+      init.name = searchParams.get("name") || "";
       const fromUrl = searchParams.get("description") || "";
       init.description = fromUrl || buildIcpPrefill(profile);
+      init.zone = searchParams.get("zone") || "Italy"; // CSV multi-region (default: tutta Italia)
     }
     return init;
   });
@@ -1636,6 +1668,33 @@ function SkillForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.raw_profile_data]);
+
+  // v3.7.10: in modalità edit (?icpId=...), precompila name + description + zone dall'ICP esistente.
+  useEffect(() => {
+    if (skillId !== "icp-builder") return;
+    const editingId = searchParams.get("icpId");
+    if (!editingId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("icps")
+        .select("name, description, filters_override")
+        .eq("id", editingId)
+        .maybeSingle();
+      if (!cancelled && data) {
+        const fo = (data as any).filters_override || {};
+        const locs = Array.isArray(fo.locations) ? fo.locations : [];
+        setValues((prev) => ({
+          ...prev,
+          name: prev.name || (data as any).name || "",
+          description: prev.description || (data as any).description || "",
+          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(",") : "Italy"),
+        }));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skillId, searchParams]);
 
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
 
@@ -1726,15 +1785,80 @@ function SkillForm({
     );
   }
   if (skillId === "icp-builder") {
+    // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
+    const selectedZones = (values.zone || "Italy").split(",").map((z) => z.trim()).filter(Boolean);
+    const toggleZone = (z: string) => {
+      const set_ = new Set(selectedZones);
+      if (z === "Italy") {
+        // Selezionare "Tutta Italia" deseleziona tutte le altre regioni.
+        setValues((prev) => ({ ...prev, zone: "Italy" }));
+        return;
+      }
+      // Selezionare una regione specifica deseleziona "Italy" generico.
+      set_.delete("Italy");
+      if (set_.has(z)) set_.delete(z);
+      else set_.add(z);
+      const next = Array.from(set_);
+      setValues((prev) => ({ ...prev, zone: next.length > 0 ? next.join(",") : "Italy" }));
+    };
+    const editingIcpId = searchParams.get("icpId");
     return (
       <div className="space-y-4">
-        <Textarea
-          placeholder="Descrivi il tuo cliente ideale..."
-          value={values.description || ""}
-          onChange={(e) => set("description", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary transition-colors"
-          rows={4}
-        />
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Nome ICP <span className="text-muted-foreground/60">(es. "PMI manifatturiere Lombardia", "Agenzie marketing Roma")</span>
+          </label>
+          <Input
+            placeholder="Nome breve per identificare questo ICP"
+            value={values.name || ""}
+            onChange={(e) => set("name", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary h-11"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Descrizione del cliente ideale</label>
+          <Textarea
+            placeholder="Descrivi il tuo cliente ideale: settore, dimensione, ruoli, problemi che vuole risolvere..."
+            value={values.description || ""}
+            onChange={(e) => set("description", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={4}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Zone target <span className="text-muted-foreground/60">(scegli una o più regioni; default: tutta Italia)</span>
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {REGIONI_IT.map((r) => {
+              const active = selectedZones.includes(r.value);
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => toggleZone(r.value)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-surface border-border/50 hover:border-primary/50 text-muted-foreground"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {!editingIcpId && (
+          <p className="text-[11px] text-muted-foreground bg-primary/5 border border-primary/20 rounded-lg p-2">
+            💡 Stai creando un <strong>nuovo ICP</strong>. Verrà aggiunto a "I miei ICP" senza sovrascrivere quelli esistenti.
+          </p>
+        )}
+        {editingIcpId && (
+          <p className="text-[11px] text-muted-foreground bg-amber-500/5 border border-amber-500/20 rounded-lg p-2">
+            ✏️ Stai <strong>modificando</strong> un ICP esistente. Le modifiche sostituiranno la versione corrente.
+          </p>
+        )}
         {submitBtn}
       </div>
     );
@@ -1853,25 +1977,44 @@ export default function SkillPage() {
     }
   }, [skill?.id, profile?.raw_profile_data, forceNewRun, output]);
 
-  // v3.4.3 (P5): cache loading per icp-builder. Fonte di verità = profiles.raw_profile_data.icp_current.
-  // L'ICP diventa persistente come la dashboard: refresh pagina, altro device, nuova sessione → sempre disponibile.
+  // v3.7.10: cache loading per icp-builder. Fonte di verità = tabella `icps` (via useIcps).
+  //   - ?new=1            → form pulito, niente cache
+  //   - ?icpId=<uuid>     → carica QUELL'ICP per modifica (anche values: name/description/zone)
+  //   - (nessun param)    → mostra ICP default come cache (compat con flusso v3.6)
   useEffect(() => {
     if (skill?.id !== "icp-builder") return;
     if (forceNewRun) return;
     if (output) return;
+    const isNewIcp = searchParams.get("new") === "1";
+    if (isNewIcp) return;
 
-    const cached = (profile?.raw_profile_data as any)?.icp_current;
-    if (cached?.icp) {
+    const editingIcpId = searchParams.get("icpId");
+    if (editingIcpId) {
+      const target = icpHook.icps.find((i) => i.id === editingIcpId);
+      if (target) {
+        setOutput({
+          icp: target.icp_json,
+          buyer_personas: target.buyer_personas,
+          linkedin_search_query: target.linkedin_search_query,
+          trigger_events: target.trigger_events,
+          exclusioni: target.exclusioni,
+        });
+        setLoadedFromCache(true);
+      }
+      return;
+    }
+
+    if (icpHook.defaultIcp) {
       setOutput({
-        icp: cached.icp,
-        buyer_personas: cached.buyer_personas,
-        linkedin_search_query: cached.linkedin_search_query,
-        trigger_events: cached.trigger_events,
-        exclusioni: cached.exclusioni,
+        icp: icpHook.defaultIcp.icp_json,
+        buyer_personas: icpHook.defaultIcp.buyer_personas,
+        linkedin_search_query: icpHook.defaultIcp.linkedin_search_query,
+        trigger_events: icpHook.defaultIcp.trigger_events,
+        exclusioni: icpHook.defaultIcp.exclusioni,
       });
       setLoadedFromCache(true);
     }
-  }, [skill?.id, profile?.raw_profile_data, forceNewRun, output]);
+  }, [skill?.id, icpHook.icps, icpHook.defaultIcp, forceNewRun, output, searchParams]);
 
   // Scroll to target section after output renders
   useEffect(() => {
@@ -2078,33 +2221,51 @@ export default function SkillPage() {
         }
       }
 
-      // v3.4.3 (P5): persistenza ICP su DB (fonte di verità) + localStorage (cache veloce).
-      // L'ICP è salvato in profiles.raw_profile_data.icp_current via merge (non sovrascrive l'analisi profilo).
-      // Così refresh pagina / cambio device / nuova sessione → ICP sempre disponibile.
-      // Fix B: se data.icp non esiste (schema backend diverso), usa l'intero `data` come ICP.
-      // v3.4.4 fix: mergeRawProfileData legge lo stato fresco dal DB (no stale closure).
-      // Phase 2 TODO: migrare su tabella `icps` con history.
+      // v3.7.10: persistenza ICP su tabella `icps` (multi-ICP).
+      // Modalità:
+      //   - ?icpId=<uuid> → UPDATE quello specifico
+      //   - ?new=1 oppure nessun ICP esistente → INSERT nuovo
+      //   - default (nessun param + esiste defaultIcp) → INSERT NUOVO (NON sovrascrive!).
+      // L'utente che vuole sostituire un ICP deve farlo da /icps → "Modifica".
       if (skill.id === "icp-builder") {
         const data = (result.data ?? {}) as any;
         const icpPayload = data?.icp ?? data;
         if (icpPayload && typeof icpPayload === "object" && Object.keys(icpPayload).length > 0) {
-          const icpRecord = {
-            generated_at: new Date().toISOString(),
-            icp: icpPayload,
+          const editingIcpId = searchParams.get("icpId");
+          const isNewIcp = searchParams.get("new") === "1";
+          const inputName = (formValues.name || "").trim();
+          // Zone target: CSV string → array. "Italy" significa "tutta Italia" e va passato come-is.
+          const zonesCsv = (formValues.zone || "Italy").trim();
+          const zones = zonesCsv.split(",").map((z) => z.trim()).filter(Boolean);
+          const filtersOverride: Record<string, unknown> = zones.length > 0 ? { locations: zones } : {};
+
+          const fields = {
+            icp_json: icpPayload,
             buyer_personas: data.buyer_personas ?? null,
             linkedin_search_query: data.linkedin_search_query ?? null,
             trigger_events: data.trigger_events ?? null,
             exclusioni: data.exclusioni ?? null,
-            user_input: formValues.description || "",
+            description: formValues.description || "",
+            filters_override: filtersOverride,
           };
-          // Salva su DB con merge fresco (preserva auto-profile-setup e ogni altra chiave)
-          await mergeRawProfileData({ icp_current: icpRecord });
-          // Fallback localStorage (utile se profile non ancora hydrated)
-          try {
-            localStorage.setItem("ember:last_icp", JSON.stringify(icpRecord));
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.warn("[SkillPage] localStorage set failed:", e);
+
+          if (editingIcpId) {
+            // UPDATE
+            const patch: any = { ...fields };
+            if (inputName) patch.name = inputName;
+            const updated = await icpHook.update(editingIcpId, patch);
+            if (updated) toast.success(`ICP "${updated.name}" aggiornato.`);
+          } else {
+            // INSERT (sempre nuovo, anche se non c'è ?new=1)
+            const fallbackName = inputName || `ICP del ${new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+            const isFirst = icpHook.icps.length === 0;
+            const created = await icpHook.create({
+              name: fallbackName,
+              ...fields,
+              is_default: isFirst,
+              source: "auto",
+            });
+            if (created) toast.success(`ICP "${created.name}" creato.`);
           }
         } else {
           // eslint-disable-next-line no-console
