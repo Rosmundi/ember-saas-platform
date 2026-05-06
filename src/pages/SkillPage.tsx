@@ -1650,7 +1650,7 @@ function SkillForm({
       init.name = searchParams.get("name") || "";
       const fromUrl = searchParams.get("description") || "";
       init.description = fromUrl || buildIcpPrefill(profile);
-      init.zone = searchParams.get("zone") || "Italy"; // CSV multi-region (default: tutta Italia)
+      init.zone = serializeZones(parseZones(searchParams.get("zone") || "Italy")); // multi-region (default: tutta Italia)
     }
     return init;
   });
@@ -1704,7 +1704,7 @@ function SkillForm({
           ...prev,
           name: prev.name || (data as any).name || "",
           description: prev.description || (data as any).description || "",
-          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(",") : "Italy"),
+          zone: prev.zone && prev.zone !== serializeZones(["Italy"]) ? prev.zone : serializeZones(locs.length > 0 ? locs : ["Italy"]),
         }));
       }
     })();
@@ -1802,12 +1802,12 @@ function SkillForm({
   }
   if (skillId === "icp-builder") {
     // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
-    const selectedZones = (values.zone || "Italy").split(",").map((z) => z.trim()).filter(Boolean);
+    const selectedZones = parseZones(values.zone);
     const toggleZone = (z: string) => {
       const set_ = new Set(selectedZones);
       if (z === "Italy") {
         // Selezionare "Tutta Italia" deseleziona tutte le altre regioni.
-        setValues((prev) => ({ ...prev, zone: "Italy" }));
+        setValues((prev) => ({ ...prev, zone: serializeZones(["Italy"]) }));
         return;
       }
       // Selezionare una regione specifica deseleziona "Italy" generico.
@@ -1815,7 +1815,7 @@ function SkillForm({
       if (set_.has(z)) set_.delete(z);
       else set_.add(z);
       const next = Array.from(set_);
-      setValues((prev) => ({ ...prev, zone: next.length > 0 ? next.join(",") : "Italy" }));
+      setValues((prev) => ({ ...prev, zone: serializeZones(next.length > 0 ? next : ["Italy"]) }));
     };
     const editingIcpId = searchParams.get("icpId");
     return (
