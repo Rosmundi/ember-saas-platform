@@ -70,6 +70,22 @@ const REGIONI_IT: Array<{ value: string; label: string }> = [
   { value: "Aosta Valley, Italy",            label: "Valle d'Aosta" },
 ];
 
+const serializeZones = (zones: string[]) => JSON.stringify(zones.length > 0 ? zones : ["Italy"]);
+
+const parseZones = (raw?: string): string[] => {
+  if (!raw) return ["Italy"];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((z): z is string => typeof z === "string" && z.trim().length > 0);
+  } catch {
+    // fallback per vecchi valori/query param non JSON
+  }
+  const exact = REGIONI_IT.find((r) => r.value === raw);
+  if (exact) return [exact.value];
+  const matched = REGIONI_IT.filter((r) => raw.includes(r.value)).map((r) => r.value);
+  return matched.length > 0 ? matched : ["Italy"];
+};
+
 // ============ UTILITY COMPONENTS ============
 
 function CopyButton({ text }: { text: string }) {
@@ -1634,7 +1650,7 @@ function SkillForm({
       init.name = searchParams.get("name") || "";
       const fromUrl = searchParams.get("description") || "";
       init.description = fromUrl || buildIcpPrefill(profile);
-      init.zone = searchParams.get("zone") || "Italy"; // CSV multi-region (default: tutta Italia)
+      init.zone = serializeZones(parseZones(searchParams.get("zone") || "Italy")); // multi-region (default: tutta Italia)
     }
     return init;
   });
@@ -1688,7 +1704,7 @@ function SkillForm({
           ...prev,
           name: prev.name || (data as any).name || "",
           description: prev.description || (data as any).description || "",
-          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(",") : "Italy"),
+          zone: prev.zone && prev.zone !== serializeZones(["Italy"]) ? prev.zone : serializeZones(locs.length > 0 ? locs : ["Italy"]),
         }));
       }
     })();
@@ -1786,12 +1802,12 @@ function SkillForm({
   }
   if (skillId === "icp-builder") {
     // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
-    const selectedZones = (values.zone || "Italy").split(",").map((z) => z.trim()).filter(Boolean);
+    const selectedZones = parseZones(values.zone);
     const toggleZone = (z: string) => {
       const set_ = new Set(selectedZones);
       if (z === "Italy") {
         // Selezionare "Tutta Italia" deseleziona tutte le altre regioni.
-        setValues((prev) => ({ ...prev, zone: "Italy" }));
+        setValues((prev) => ({ ...prev, zone: serializeZones(["Italy"]) }));
         return;
       }
       // Selezionare una regione specifica deseleziona "Italy" generico.
@@ -1799,7 +1815,7 @@ function SkillForm({
       if (set_.has(z)) set_.delete(z);
       else set_.add(z);
       const next = Array.from(set_);
-      setValues((prev) => ({ ...prev, zone: next.length > 0 ? next.join(",") : "Italy" }));
+      setValues((prev) => ({ ...prev, zone: serializeZones(next.length > 0 ? next : ["Italy"]) }));
     };
     const editingIcpId = searchParams.get("icpId");
     return (
@@ -2234,9 +2250,8 @@ export default function SkillPage() {
           const editingIcpId = searchParams.get("icpId");
           const isNewIcp = searchParams.get("new") === "1";
           const inputName = (formValues.name || "").trim();
-          // Zone target: CSV string → array. "Italy" significa "tutta Italia" e va passato come-is.
-          const zonesCsv = (formValues.zone || "Italy").trim();
-          const zones = zonesCsv.split(",").map((z) => z.trim()).filter(Boolean);
+          // Zone target: stato JSON → array. "Italy" significa "tutta Italia" e va passato come-is.
+          const zones = parseZones(formValues.zone);
           const filtersOverride: Record<string, unknown> = zones.length > 0 ? { locations: zones } : {};
 
           const fields = {
