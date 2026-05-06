@@ -70,6 +70,22 @@ const REGIONI_IT: Array<{ value: string; label: string }> = [
   { value: "Aosta Valley, Italy",            label: "Valle d'Aosta" },
 ];
 
+const serializeZones = (zones: string[]) => JSON.stringify(zones.length > 0 ? zones : ["Italy"]);
+
+const parseZones = (raw?: string): string[] => {
+  if (!raw) return ["Italy"];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((z): z is string => typeof z === "string" && z.trim().length > 0);
+  } catch {
+    // fallback per vecchi valori/query param non JSON
+  }
+  const exact = REGIONI_IT.find((r) => r.value === raw);
+  if (exact) return [exact.value];
+  const matched = REGIONI_IT.filter((r) => raw.includes(r.value)).map((r) => r.value);
+  return matched.length > 0 ? matched : ["Italy"];
+};
+
 // ============ UTILITY COMPONENTS ============
 
 function CopyButton({ text }: { text: string }) {
