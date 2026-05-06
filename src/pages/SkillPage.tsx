@@ -70,22 +70,6 @@ const REGIONI_IT: Array<{ value: string; label: string }> = [
   { value: "Aosta Valley, Italy",            label: "Valle d'Aosta" },
 ];
 
-const serializeZones = (zones: string[]) => JSON.stringify(zones.length > 0 ? zones : ["Italy"]);
-
-const parseZones = (raw?: string): string[] => {
-  if (!raw) return ["Italy"];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.filter((z): z is string => typeof z === "string" && z.trim().length > 0);
-  } catch {
-    // fallback per vecchi valori/query param non JSON
-  }
-  const exact = REGIONI_IT.find((r) => r.value === raw);
-  if (exact) return [exact.value];
-  const matched = REGIONI_IT.filter((r) => raw.includes(r.value)).map((r) => r.value);
-  return matched.length > 0 ? matched : ["Italy"];
-};
-
 // ============ UTILITY COMPONENTS ============
 
 function CopyButton({ text }: { text: string }) {
@@ -151,7 +135,28 @@ function buildPayload(
     case "profile-optimizer":
       return { profilo_business: bp, obiettivo: values.obiettivo || "attrarre clienti B2B" };
     case "post-writer":
-      return { profilo_business: bp, tema: values.brief, formato: (values.format || "storytelling").toLowerCase() };
+      // v3.8.0: brand_kit + tone override + ICP target opzionale
+      return {
+        profilo_business: bp,
+        tema: values.brief,
+        formato: (values.format || "storytelling").toLowerCase(),
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
+        icp_target: (values.icp_target_json && JSON.parse(values.icp_target_json)) || null,
+      };
+    case "post-improver":
+      // v3.8.0 (Tranche 1): post mediocre → versione migliorata + score before/after + diff.
+      return {
+        profilo_business: bp,
+        post_originale: values.post_originale,
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
+      };
+    case "hook-generator":
+      // v3.8.0 (Tranche 1): tema → 5 hook (curiosity, contrarian, data, story, question).
+      return {
+        profilo_business: bp,
+        tema: values.tema,
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
+      };
     case "visual-post-builder":
       return { post_text: values.post, formato_visual: (values.style || "carousel").toLowerCase() };
     case "content-performance":
@@ -641,58 +646,309 @@ function SkillOutput({
   }
 
   if (skillId === "post-writer") {
-    const hook = data.hook || data.post_text?.split("\n")[0] || "";
-    const body = data.body || data.post_text || "";
-    const cta = data.cta || "";
-    const hashtags = data.hashtags || [];
+    // v3.8.0: rendering esteso con varianti A/B + tips + char count.
+    const mainPost = data.post_text || "";
+    const mainHook = data.hook || mainPost.split("\n")[0] || "";
+    const variantA = data.variant_a || null;
+    const variantB = data.variant_b || null;
+    const tips: string[] = Array.isArray(data.tips) ? data.tips : [];
+    const hashtags: string[] = Array.isArray(data.hashtags) ? data.hashtags : [];
+    const charCount = data.char_count || mainPost.length;
+
+    const VariantCard = ({
+      label,
+      hook,
+      text,
+      angle,
+    }: {
+      label: string;
+      hook: string;
+      text: string;
+      angle?: string;
+    }) => (
+      <Card className="bg-surface/50 border-border/30">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <Badge className="bg-primary/10 text-primary border-0">{label}</Badge>
+            {angle && (
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                {angle}
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-bold border-l-2 border-primary pl-3 whitespace-pre-wrap">
+            {hook}
+          </p>
+          <p className="text-sm whitespace-pre-wrap text-muted-foreground leading-relaxed">
+            {text}
+          </p>
+          <div className="flex justify-between items-center pt-2 border-t border-border/20">
+            <CharCounter text={text} limit={1200} />
+            <CopyButton text={text} />
+          </div>
+        </CardContent>
+      </Card>
+    );
+
     return (
-      <div className="space-y-4 animate-in">
-        <div className="border-l-4 border-primary bg-primary/5 p-5 rounded-r-xl">
-          <p className="font-bold text-lg whitespace-pre-wrap leading-relaxed">{hook}</p>
-        </div>
-        <div className="text-sm whitespace-pre-wrap leading-relaxed px-1">{body}</div>
-        {cta && (
-          <div className="bg-primary/5 border border-primary/20 p-5 rounded-xl">
-            <p className="text-sm whitespace-pre-wrap">{cta}</p>
+      <div className="space-y-5 animate-in">
+        {/* Versione principale */}
+        <Card className="bg-card border-primary/30">
+          <CardContent className="p-5 space-y-3">
+            <Badge className="bg-primary text-primary-foreground border-0">Versione consigliata</Badge>
+            <div className="border-l-4 border-primary bg-primary/5 p-4 rounded-r-xl">
+              <p className="font-bold text-base whitespace-pre-wrap leading-relaxed">{mainHook}</p>
+            </div>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{mainPost}</p>
+            {hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {hashtags.map((h: string) => (
+                  <Badge key={h} variant="outline" className="border-border/50 text-[10px]">
+                    {h.startsWith("#") ? h : `#${h}`}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-3 border-t border-border/20 flex-wrap gap-2">
+              <span className="text-xs text-muted-foreground">
+                {charCount} caratteri
+                {data.estimated_read_time_sec && <> · Tempo lettura ~{data.estimated_read_time_sec}s</>}
+              </span>
+              <div className="flex gap-2">
+                <CopyButton text={mainPost} />
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="border-border/50 hover:border-primary/50 hover:text-primary"
+                >
+                  <Link to={`/skill/visual-post-builder?post=${encodeURIComponent(mainPost)}`}>
+                    Crea visual <ChevronRight className="ml-1 h-3 w-3" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Varianti A/B */}
+        {(variantA || variantB) && (
+          <div>
+            <h3 className="font-semibold text-sm mb-3">Varianti per A/B test</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {variantA && (
+                <VariantCard
+                  label="Variante A"
+                  hook={variantA.hook || ""}
+                  text={variantA.post_text || ""}
+                  angle={variantA.angle}
+                />
+              )}
+              {variantB && (
+                <VariantCard
+                  label="Variante B"
+                  hook={variantB.hook || ""}
+                  text={variantB.post_text || ""}
+                  angle={variantB.angle}
+                />
+              )}
+            </div>
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          {hashtags.map((h: string) => (
-            <Badge key={h} variant="outline" className="border-border/50">
-              {h}
-            </Badge>
-          ))}
+
+        {/* Tips operativi */}
+        {tips.length > 0 && (
+          <Card className="bg-warning/5 border-warning/30">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-warning">
+                Tips per amplificare la performance
+              </p>
+              <ul className="space-y-1.5">
+                {tips.slice(0, 3).map((t, i) => (
+                  <li key={i} className="text-sm flex items-start gap-2">
+                    <span className="text-warning shrink-0">→</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* CTA bottom: rigenera hook (link a hook-generator pre-popolato) */}
+        <div className="pt-2">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-primary"
+          >
+            <Link
+              to={`/skill/hook-generator?tema=${encodeURIComponent(data.tema_input || mainHook.slice(0, 100))}`}
+            >
+              Non convince l'hook? Genera 5 alternative <ChevronRight className="ml-1 h-3 w-3" />
+            </Link>
+          </Button>
         </div>
-        {data.alt_hook && (
-          <details className="text-sm group">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
-              Hook alternativo
-            </summary>
-            <p className="mt-2 whitespace-pre-wrap bg-surface/50 p-4 rounded-xl border border-border/30 animate-in">
-              {data.alt_hook}
-            </p>
-          </details>
+      </div>
+    );
+  }
+
+  // ============ POST-IMPROVER (v3.8.0 Tranche 1) ============
+  if (skillId === "post-improver") {
+    const improved: string = data.post_improved || "";
+    const before = (data.score_before || {}) as Record<string, number>;
+    const after = (data.score_after || {}) as Record<string, number>;
+    const changes: Array<{ what?: string; why?: string }> = Array.isArray(data.changes) ? data.changes : [];
+
+    const SCORE_LABELS: Record<string, string> = {
+      hook: "Hook",
+      structure: "Struttura",
+      length: "Lunghezza",
+      cta: "CTA",
+      humanness: "Naturalezza",
+    };
+
+    const ScoreRow = ({ k }: { k: string }) => {
+      const b = Number(before[k] ?? 0);
+      const a = Number(after[k] ?? 0);
+      const delta = a - b;
+      return (
+        <div className="flex items-center gap-3 text-xs">
+          <span className="w-24 text-muted-foreground">{SCORE_LABELS[k] || k}</span>
+          <div className="flex-1 flex items-center gap-2">
+            <span className="text-muted-foreground tabular-nums w-8 text-right">{b}</span>
+            <div className="flex-1 h-1.5 bg-surface rounded-full relative overflow-hidden">
+              <div
+                className="absolute inset-y-0 left-0 bg-muted-foreground/40"
+                style={{ width: `${b}%` }}
+              />
+              <div
+                className="absolute inset-y-0 left-0 bg-primary"
+                style={{ width: `${a}%` }}
+              />
+            </div>
+            <span className="font-semibold tabular-nums w-8 text-right">{a}</span>
+            {delta !== 0 && (
+              <span
+                className={`text-[10px] font-semibold ${
+                  delta > 0 ? "text-emerald-400" : "text-destructive"
+                }`}
+              >
+                {delta > 0 ? "+" : ""}
+                {delta}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-5 animate-in">
+        <Card className="bg-card border-primary/30">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <Badge className="bg-primary text-primary-foreground border-0">Versione migliorata</Badge>
+              <span className="text-xs text-muted-foreground">{improved.length} caratteri</span>
+            </div>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{improved}</p>
+            <div className="flex justify-end pt-2 border-t border-border/20">
+              <CopyButton text={improved} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {Object.keys(after).length > 0 && (
+          <Card className="bg-surface/50 border-border/30">
+            <CardContent className="p-5 space-y-3">
+              <h3 className="font-semibold text-sm">Score before → after</h3>
+              <div className="space-y-2">
+                {["hook", "structure", "length", "cta", "humanness"]
+                  .filter((k) => k in after || k in before)
+                  .map((k) => (
+                    <ScoreRow key={k} k={k} />
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
-        {(data.best_time || data.estimated_read_time_sec) && (
-          <p className="text-xs text-muted-foreground">
-            ⏰{" "}
-            {data.best_time
-              ? `Orario suggerito: ${data.best_time}`
-              : `Tempo lettura: ~${data.estimated_read_time_sec}s`}
-          </p>
+
+        {changes.length > 0 && (
+          <Card className="bg-surface/30 border-border/30">
+            <CardContent className="p-5 space-y-3">
+              <h3 className="font-semibold text-sm">Cosa è cambiato</h3>
+              <ul className="space-y-3">
+                {changes.map((c, i) => (
+                  <li key={i} className="text-sm border-l-2 border-primary/40 pl-3">
+                    <p className="font-medium">{c.what}</p>
+                    {c.why && <p className="text-xs text-muted-foreground mt-0.5">{c.why}</p>}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         )}
-        <div className="flex gap-2 pt-2">
-          <CopyButton text={[hook, body, cta, hashtags.join(" ")].filter(Boolean).join("\n\n")} />
-          <Link to={`/skill/visual-post-builder?post=${encodeURIComponent(hook + "\n" + body)}`}>
+      </div>
+    );
+  }
+
+  // ============ HOOK-GENERATOR (v3.8.0 Tranche 1) ============
+  if (skillId === "hook-generator") {
+    const hooks: Array<{ angle: string; text: string }> = Array.isArray(data.hooks) ? data.hooks : [];
+    const ANGLE_LABELS: Record<string, string> = {
+      curiosity: "Curiosity gap",
+      contrarian: "Contrarian",
+      data: "Data-driven",
+      story: "Story",
+      question: "Domanda",
+    };
+    const ANGLE_COLORS: Record<string, string> = {
+      curiosity: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+      contrarian: "bg-destructive/15 text-destructive border-destructive/30",
+      data: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+      story: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+      question: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+    };
+
+    return (
+      <div className="space-y-3 animate-in">
+        <p className="text-sm text-muted-foreground">
+          5 hook con angoli diversi. Copia quello che ti convince e usalo come prima riga del post.
+        </p>
+        {hooks.map((h, i) => (
+          <Card key={i} className="bg-surface/50 border-border/30 hover:border-border transition-all">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] border ${ANGLE_COLORS[h.angle] || "border-border/50"}`}
+                >
+                  {ANGLE_LABELS[h.angle] || h.angle}
+                </Badge>
+                <CharCounter text={h.text || ""} limit={120} />
+              </div>
+              <p className="text-base font-medium leading-relaxed">{h.text}</p>
+              <div className="flex justify-end pt-1">
+                <CopyButton text={h.text} />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        {hooks.length > 0 && (
+          <div className="pt-3 border-t border-border/30">
             <Button
+              asChild
               variant="outline"
               size="sm"
-              className="border-border/50 hover:border-primary/50 hover:text-primary transition-all"
+              className="border-border/50 hover:border-primary/50 hover:text-primary"
             >
-              Crea visual <ChevronRight className="ml-1 h-3 w-3" />
+              <Link to="/skill/post-writer">
+                Scrivi un post con uno di questi hook <ChevronRight className="ml-1 h-3 w-3" />
+              </Link>
             </Button>
-          </Link>
-        </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1642,6 +1898,11 @@ function SkillForm({
       init.headline = searchParams.get("headline") || "";
       init.azienda = searchParams.get("azienda") || "";
     }
+    // v3.8.0 (Tranche 1): hook-generator pre-compilato da query string ?tema=...
+    if (skillId === "hook-generator") {
+      init.tema = searchParams.get("tema") || "";
+    }
+    // post-improver: nessun init particolare; l'utente incolla manualmente.
     // v3.4.2 fix (P1): precompila ICP builder con target dal profilo analizzato.
     // Priorità: query string ?description= > raw_profile_data.target_buyer.
     if (skillId === "icp-builder") {
@@ -1650,7 +1911,7 @@ function SkillForm({
       init.name = searchParams.get("name") || "";
       const fromUrl = searchParams.get("description") || "";
       init.description = fromUrl || buildIcpPrefill(profile);
-      init.zone = serializeZones(parseZones(searchParams.get("zone") || "Italy")); // multi-region (default: tutta Italia)
+      init.zone = searchParams.get("zone") || "Italy"; // CSV multi-region (default: tutta Italia)
     }
     return init;
   });
@@ -1704,7 +1965,7 @@ function SkillForm({
           ...prev,
           name: prev.name || (data as any).name || "",
           description: prev.description || (data as any).description || "",
-          zone: prev.zone && prev.zone !== serializeZones(["Italy"]) ? prev.zone : serializeZones(locs.length > 0 ? locs : ["Italy"]),
+          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(",") : "Italy"),
         }));
       }
     })();
@@ -1741,24 +2002,72 @@ function SkillForm({
   if (skillId === "post-writer") {
     return (
       <div className="space-y-4">
-        <Textarea
-          placeholder="Descrivi il post che vuoi scrivere..."
-          value={values.brief || ""}
-          onChange={(e) => set("brief", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary transition-colors"
-          rows={4}
-        />
-        <Select value={values.format || "Storytelling"} onValueChange={(v) => set("format", v)}>
-          <SelectTrigger className="bg-surface border-border/50">
-            <SelectValue placeholder="Formato" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Storytelling">Storytelling</SelectItem>
-            <SelectItem value="Insight">Insight</SelectItem>
-            <SelectItem value="Case Study">Case Study</SelectItem>
-            <SelectItem value="Polarizzante">Polarizzante</SelectItem>
-          </SelectContent>
-        </Select>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Tema / idea / notizia</label>
+          <Textarea
+            placeholder="Es. 'Ho appena chiuso un cliente parlando di un errore comune nelle PMI manifatturiere. Voglio raccontare la lezione.'"
+            value={values.brief || ""}
+            onChange={(e) => set("brief", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={5}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Formato</label>
+          <Select value={values.format || "Storytelling"} onValueChange={(v) => set("format", v)}>
+            <SelectTrigger className="bg-surface border-border/50">
+              <SelectValue placeholder="Formato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Storytelling">Storytelling — racconta un'esperienza</SelectItem>
+              <SelectItem value="Insight">Insight — un'idea + perché conta</SelectItem>
+              <SelectItem value="Case Study">Case Study — problema + soluzione + risultato</SelectItem>
+              <SelectItem value="Polarizzante">Polarizzante — opinione contraria al mainstream</SelectItem>
+              <SelectItem value="Listicle">Listicle — N modi per X</SelectItem>
+              <SelectItem value="Lezione">Lezione — cosa ho imparato facendo X</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {submitBtn}
+      </div>
+    );
+  }
+  if (skillId === "post-improver") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Post da migliorare</label>
+          <Textarea
+            placeholder="Incolla qui il tuo post LinkedIn così com'è, anche bozza grezza..."
+            value={values.post_originale || ""}
+            onChange={(e) => set("post_originale", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={9}
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Manteniamo il tuo messaggio centrale e la tua voce. Cambiamo solo struttura, hook, CTA e fluidità.
+          </p>
+        </div>
+        {submitBtn}
+      </div>
+    );
+  }
+  if (skillId === "hook-generator") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Tema / argomento del post</label>
+          <Textarea
+            placeholder="Es. 'Errori comuni nelle PMI nel scegliere un CRM' oppure 'Perché il networking sui fiere non funziona più'"
+            value={values.tema || ""}
+            onChange={(e) => set("tema", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={3}
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Genereremo 5 hook (prima riga del post) con angoli diversi: curiosity, contrarian, data, story, question.
+          </p>
+        </div>
         {submitBtn}
       </div>
     );
@@ -1802,12 +2111,12 @@ function SkillForm({
   }
   if (skillId === "icp-builder") {
     // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
-    const selectedZones = parseZones(values.zone);
+    const selectedZones = (values.zone || "Italy").split(",").map((z) => z.trim()).filter(Boolean);
     const toggleZone = (z: string) => {
       const set_ = new Set(selectedZones);
       if (z === "Italy") {
         // Selezionare "Tutta Italia" deseleziona tutte le altre regioni.
-        setValues((prev) => ({ ...prev, zone: serializeZones(["Italy"]) }));
+        setValues((prev) => ({ ...prev, zone: "Italy" }));
         return;
       }
       // Selezionare una regione specifica deseleziona "Italy" generico.
@@ -1815,7 +2124,7 @@ function SkillForm({
       if (set_.has(z)) set_.delete(z);
       else set_.add(z);
       const next = Array.from(set_);
-      setValues((prev) => ({ ...prev, zone: serializeZones(next.length > 0 ? next : ["Italy"]) }));
+      setValues((prev) => ({ ...prev, zone: next.length > 0 ? next.join(",") : "Italy" }));
     };
     const editingIcpId = searchParams.get("icpId");
     return (
@@ -2089,9 +2398,22 @@ export default function SkillPage() {
     // Usiamo l'ICP strutturato salvato da icp-builder (raw_profile_data.icp_current) se presente,
     // altrimenti fallback su {descrizione: testo libero}.
     let effectiveSkillId: string = skill.id;
+
+    // v3.8.0 (Tranche 1): inietta brand_kit nel formValues per le skill content-writing.
+    // buildPayload legge values.brand_kit_json (string JSON) e lo deserializza.
+    const brandKit = ((profile as any)?.brand_kit as Record<string, unknown> | undefined) ?? null;
+    const formValuesWithBrand: Record<string, string> = {
+      ...formValues,
+      brand_kit_json: brandKit ? JSON.stringify(brandKit) : "",
+      // ICP target opzionale (per post-writer): default = ICP default dell'utente, se presente.
+      icp_target_json:
+        formValues.icp_target_json ||
+        (icpHook.defaultIcp?.icp_json ? JSON.stringify(icpHook.defaultIcp.icp_json) : ""),
+    };
+
     let payload = buildPayload(
       skill.id,
-      formValues,
+      formValuesWithBrand,
       profile.business_profile as unknown as Record<string, unknown> | null,
       user.id,
     );
@@ -2250,8 +2572,9 @@ export default function SkillPage() {
           const editingIcpId = searchParams.get("icpId");
           const isNewIcp = searchParams.get("new") === "1";
           const inputName = (formValues.name || "").trim();
-          // Zone target: stato JSON → array. "Italy" significa "tutta Italia" e va passato come-is.
-          const zones = parseZones(formValues.zone);
+          // Zone target: CSV string → array. "Italy" significa "tutta Italia" e va passato come-is.
+          const zonesCsv = (formValues.zone || "Italy").trim();
+          const zones = zonesCsv.split(",").map((z) => z.trim()).filter(Boolean);
           const filtersOverride: Record<string, unknown> = zones.length > 0 ? { locations: zones } : {};
 
           const fields = {
@@ -2390,10 +2713,7 @@ export default function SkillPage() {
   // Per auto-profile-setup con cache: NON mostrare il form, solo risultato + Rianalizza
   const isAutoProfileWithCache = skill.id === "auto-profile-setup" && loadedFromCache && !forceNewRun;
   // v3.4.3 (P5): stesso comportamento per icp-builder. Se c'è un ICP in DB, nascondi il form e mostra "Rianalizza".
-  // v3.7.11 fix: in modalità modifica (?icpId=...) il form DEVE restare visibile, altrimenti l'utente
-  // non può cambiare nome/zone (le pill regioni sembrano "non cliccabili" perché il form non viene renderizzato).
-  const isEditingExistingIcp = skill.id === "icp-builder" && !!searchParams.get("icpId");
-  const isIcpBuilderWithCache = skill.id === "icp-builder" && loadedFromCache && !forceNewRun && !isEditingExistingIcp;
+  const isIcpBuilderWithCache = skill.id === "icp-builder" && loadedFromCache && !forceNewRun;
   const showCacheBanner = isAutoProfileWithCache || isIcpBuilderWithCache;
   const hideFormBecauseCache = showCacheBanner;
 

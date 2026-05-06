@@ -32,7 +32,10 @@ const ALLOWED_SKILLS = new Set<string>([
   "icp-builder",
   "outreach-drafter",
   "prospect-search-harvest",
-  // (Pezzo 2C in arrivo: "company-search")
+  // v3.8.0 (Tranche 1, Pezzo 4A) — content writing skills
+  "post-writer",
+  "post-improver",
+  "hook-generator",
 ]);
 
 const SEARCH_CONSUMING_SKILLS = new Set<string>([

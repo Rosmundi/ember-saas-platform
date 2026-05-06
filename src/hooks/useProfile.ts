@@ -38,6 +38,7 @@ interface ProfileRow {
   stripe_subscription_id: string | null;
   created_at: string;
   updated_at: string;
+  brand_kit?: Record<string, unknown> | null;
 }
 
 function rowToProfile(row: ProfileRow): Profile {

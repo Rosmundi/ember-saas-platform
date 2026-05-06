@@ -1,3 +1,4 @@
+// src/App.tsx — v3.8.0 (Tranche 1): aggiunta route /brand
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -15,6 +16,7 @@ import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
 import Icps from "./pages/Icps";
 import Searches from "./pages/Searches";
+import Brand from "./pages/Brand";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +69,11 @@ const App = () => (
             <Route path="/searches" element={
               <ProtectedRoute>
                 <Searches />
+              </ProtectedRoute>
+            } />
+            <Route path="/brand" element={
+              <ProtectedRoute>
+                <Brand />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
