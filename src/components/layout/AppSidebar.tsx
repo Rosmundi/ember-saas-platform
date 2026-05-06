@@ -1,10 +1,11 @@
+// src/components/layout/AppSidebar.tsx — v3.8.0 (Tranche 1): voce "Brand" in mainNav
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { SkillIcon } from "@/components/SkillIcon";
 import { SKILLS } from "@/lib/ember-types";
 import { useProfile } from "@/hooks/useProfile";
 import {
-  LayoutDashboard, Clock, Radar, Settings, LogOut, Target, History,
+  LayoutDashboard, Clock, Radar, Settings, LogOut, Target, History, Palette,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -17,6 +18,7 @@ const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Cronologia", url: "/history", icon: Clock },
   { title: "Watchlist", url: "/watchlist", icon: Radar },
+  { title: "Brand", url: "/brand", icon: Palette },
   { title: "Impostazioni", url: "/settings", icon: Settings },
 ];
 

@@ -102,6 +102,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          brand_kit: Json
           business_profile: Json | null
           company_name: string | null
           created_at: string
@@ -131,6 +132,7 @@ export type Database = {
           watchlist_max_items: number
         }
         Insert: {
+          brand_kit?: Json
           business_profile?: Json | null
           company_name?: string | null
           created_at?: string
@@ -160,6 +162,7 @@ export type Database = {
           watchlist_max_items?: number
         }
         Update: {
+          brand_kit?: Json
           business_profile?: Json | null
           company_name?: string | null
           created_at?: string

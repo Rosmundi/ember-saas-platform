@@ -1,6 +1,12 @@
+// src/lib/ember-types.ts
+// v3.8.0 (Tranche 1 — Pezzo 4A): aggiunge BrandKit + skill IDs nuove
+// (post-improver, hook-generator).
+
 export type SkillId =
   | "auto-profile-setup"
   | "post-writer"
+  | "post-improver"
+  | "hook-generator"
   | "visual-post-builder"
   | "content-performance"
   | "icp-builder"
@@ -10,6 +16,17 @@ export type SkillId =
   | "network-intelligence";
 
 export type PlanType = "trial" | "base" | "pro" | "studio";
+
+// ============================================================================
+// BrandKit — v3.8.0 (migration 012)
+// ============================================================================
+// Brand kit minimale: 1 colore primario + tone of voice. Salvato in
+// profiles.brand_kit JSONB, opzionale (default = {}).
+// Usato dalle skill di scrittura/content per coerenza stilistica.
+export interface BrandKit {
+  color?: string; // hex, es. "#FF6A1C"
+  tone?: "corporate" | "playful" | "minimal" | "bold";
+}
 
 export interface Profile {
   id: string;
@@ -27,6 +44,8 @@ export interface Profile {
   searches_daily_limit: number;
   searches_reset_at: string | null;
   watchlist_max_items: number;
+  // v3.8.0 (Tranche 1): brand kit (opzionale).
+  brand_kit?: BrandKit | null;
 }
 
 export interface BusinessProfile {
@@ -39,6 +58,27 @@ export interface BusinessProfile {
   punti_forza: string[];
   aree_miglioramento: string[];
   tags: string[];
+}
+
+// ============================================================================
+// ICP — tabella icps (migration 009)
+// ============================================================================
+export interface Icp {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  icp_json: Record<string, unknown>;
+  buyer_personas: unknown[] | null;
+  linkedin_search_query: unknown;
+  trigger_events: unknown;
+  exclusioni: unknown;
+  filters_override: Record<string, unknown> | null;
+  is_default: boolean;
+  source: "auto" | "manual" | "duplicate";
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
 }
 
 export interface SkillRun {
@@ -87,7 +127,28 @@ export const SKILLS: SkillConfig[] = [
     id: "post-writer",
     name: "Scrivi un post",
     icon: "PenTool",
-    description: "Post LinkedIn in italiano: storytelling, insight, case study o provocazione.",
+    description:
+      "Post LinkedIn ottimizzato per algoritmo (hook, struttura, CTA) con 2 varianti per A/B test.",
+    layer: "content",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
+    id: "post-improver",
+    name: "Migliora un post",
+    icon: "Wand2",
+    description:
+      "Incolla un post mediocre, ricevi versione migliorata con score before/after e diff dei cambiamenti.",
+    layer: "content",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
+    id: "hook-generator",
+    name: "Genera hook",
+    icon: "Zap",
+    description:
+      "5 hook diversi (curiosity, contrarian, data, story, question) per testare la prima riga del post.",
     layer: "content",
     usesScraping: false,
     plans: ["trial", "base", "pro", "studio"],
@@ -150,7 +211,8 @@ export const SKILLS: SkillConfig[] = [
     id: "network-intelligence",
     name: "Monitora la rete",
     icon: "Radar",
-    description: "Watchlist profili: segnala cambi ruolo, promozioni, post virali e suggerisce azioni.",
+    description:
+      "Watchlist profili: segnala cambi ruolo, promozioni, post virali e suggerisce azioni.",
     layer: "prospect",
     usesScraping: true,
     plans: ["pro", "studio"],
@@ -164,7 +226,10 @@ export const SCRAPING_SKILLS: SkillId[] = [
   "network-intelligence",
 ];
 
-export function canUseSkill(profile: Profile, skill: SkillConfig): { allowed: boolean; reason?: string } {
+export function canUseSkill(
+  profile: Profile,
+  skill: SkillConfig,
+): { allowed: boolean; reason?: string } {
   if (!skill.plans.includes(profile.plan)) {
     return {
       allowed: false,
