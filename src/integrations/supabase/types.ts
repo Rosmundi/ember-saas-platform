@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      content_assets: {
+        Row: {
+          created_at: string
+          id: string
+          input: Json
+          output: Json
+          parent_id: string | null
+          starred: boolean
+          status: string
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input?: Json
+          output?: Json
+          parent_id?: string | null
+          starred?: boolean
+          status?: string
+          title?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input?: Json
+          output?: Json
+          parent_id?: string | null
+          starred?: boolean
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_assets_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "content_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       icps: {
         Row: {
           buyer_personas: Json | null
