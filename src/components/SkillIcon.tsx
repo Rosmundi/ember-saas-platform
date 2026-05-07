@@ -1,12 +1,16 @@
+// src/components/SkillIcon.tsx
+// v3.8.1: aggiunti Wand2 (post-improver) + Zap (hook-generator) + Sparkles, Lightbulb (riserva).
 import {
   UserCheck, Award, PenTool, Image, BarChart3,
   Target, Search, Send, MessageSquare, Radar,
+  Wand2, Zap, Sparkles, Lightbulb,
   LucideProps,
 } from "lucide-react";
 
 const iconMap: Record<string, React.FC<LucideProps>> = {
   UserCheck, Award, PenTool, Image, BarChart3,
   Target, Search, Send, MessageSquare, Radar,
+  Wand2, Zap, Sparkles, Lightbulb,
 };
 
 interface SkillIconProps extends LucideProps {

@@ -14,6 +14,14 @@ import {
   searchSourceColor,
   searchSummary,
 } from "@/hooks/useSearches";
+// v3.8.1 (Tranche 1.5): hooks per content_assets + right rail componente
+import {
+  useContentAssets,
+  useContentAssetById,
+  autoTitleForAsset,
+  type ContentAssetType,
+} from "@/hooks/useContentAssets";
+import { ContentRail } from "@/components/content/ContentRail";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -625,12 +633,14 @@ function SkillOutput({
   targetSection,
   onRegenerateSection,
   regeneratingSection,
+  currentAssetId,
 }: {
   skillId: string;
   output: Record<string, unknown>;
   targetSection: string | null;
   onRegenerateSection: (sectionName: string, feedback: string) => Promise<void>;
   regeneratingSection: string | null;
+  currentAssetId?: string | null;
 }) {
   const data = output as any;
 
@@ -714,17 +724,42 @@ function SkillOutput({
                 {charCount} caratteri
                 {data.estimated_read_time_sec && <> · Tempo lettura ~{data.estimated_read_time_sec}s</>}
               </span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <CopyButton text={mainPost} />
+                {currentAssetId && (
+                  <>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="border-border/50 hover:border-primary/50 hover:text-primary"
+                    >
+                      <Link to={`/skill/post-improver?fromAssetId=${currentAssetId}`}>
+                        <Wand2 className="h-3 w-3 mr-1" />
+                        Migliora questo post
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="border-border/50 hover:border-primary/50 hover:text-primary"
+                    >
+                      <Link to={`/skill/hook-generator?fromAssetId=${currentAssetId}`}>
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Genera 5 hook
+                      </Link>
+                    </Button>
+                  </>
+                )}
                 <Button
-                  asChild
                   variant="outline"
                   size="sm"
-                  className="border-border/50 hover:border-primary/50 hover:text-primary"
+                  disabled
+                  className="border-border/50 opacity-50 cursor-not-allowed"
+                  title="Disponibile a breve in Tranche 2 (visual brief)"
                 >
-                  <Link to={`/skill/visual-post-builder?post=${encodeURIComponent(mainPost)}`}>
-                    Crea visual <ChevronRight className="ml-1 h-3 w-3" />
-                  </Link>
+                  Visual brief — presto
                 </Button>
               </div>
             </div>
@@ -775,21 +810,21 @@ function SkillOutput({
           </Card>
         )}
 
-        {/* CTA bottom: rigenera hook (link a hook-generator pre-popolato) */}
-        <div className="pt-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-primary"
-          >
-            <Link
-              to={`/skill/hook-generator?tema=${encodeURIComponent(data.tema_input || mainHook.slice(0, 100))}`}
+        {/* CTA bottom: rigenera hook (link a hook-generator pre-popolato dall'asset) */}
+        {currentAssetId && (
+          <div className="pt-2">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-primary"
             >
-              Non convince l'hook? Genera 5 alternative <ChevronRight className="ml-1 h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
+              <Link to={`/skill/hook-generator?fromAssetId=${currentAssetId}`}>
+                Non convince l'hook? Genera 5 alternative <ChevronRight className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -889,6 +924,34 @@ function SkillOutput({
             </CardContent>
           </Card>
         )}
+
+        {/* CTA chain dal post migliorato */}
+        {currentAssetId && (
+          <div className="flex flex-wrap gap-2 pt-3 border-t border-border/30">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="border-border/50 hover:border-primary/50 hover:text-primary"
+            >
+              <Link to={`/skill/post-improver?fromAssetId=${currentAssetId}`}>
+                <Wand2 className="h-3 w-3 mr-1" />
+                Migliora ancora
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="border-border/50 hover:border-primary/50 hover:text-primary"
+            >
+              <Link to={`/skill/hook-generator?fromAssetId=${currentAssetId}`}>
+                <Sparkles className="h-3 w-3 mr-1" />
+                Genera 5 hook
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -943,7 +1006,13 @@ function SkillOutput({
               size="sm"
               className="border-border/50 hover:border-primary/50 hover:text-primary"
             >
-              <Link to="/skill/post-writer">
+              <Link
+                to={
+                  currentAssetId
+                    ? `/skill/post-writer?fromAssetId=${currentAssetId}`
+                    : "/skill/post-writer"
+                }
+              >
                 Scrivi un post con uno di questi hook <ChevronRight className="ml-1 h-3 w-3" />
               </Link>
             </Button>
@@ -1934,6 +2003,65 @@ function SkillForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.raw_profile_data]);
 
+  // v3.8.1 (Tranche 1.5): pre-compila form da ?fromAssetId=<uuid> per chain content.
+  // Esempi:
+  //   - hook → post-writer: init.brief = "Scrivi un post che inizi con: <hook text>"
+  //   - post → post-improver: init.post_originale = post.output.post_text
+  //   - post → hook-generator: init.tema = post.input.tema (riusa lo stesso tema)
+  useEffect(() => {
+    if (!["post-writer", "post-improver", "hook-generator"].includes(skillId)) return;
+    const fromId = searchParams.get("fromAssetId");
+    if (!fromId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("content_assets")
+        .select("type, input, output, title")
+        .eq("id", fromId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const a = data as any;
+      const inp = a.input || {};
+      const out = a.output || {};
+      setValues((prev) => {
+        const next = { ...prev };
+        if (skillId === "post-writer") {
+          // se parto da hook → uso quel hook come spunto
+          if (a.type === "hook" && Array.isArray(out.hooks) && out.hooks.length) {
+            const h = out.hooks[0];
+            if (!next.brief) {
+              next.brief = `Scrivi un post che parta con questo hook:\n"${h.text}"\n\nTema generale: ${inp.tema || ""}`;
+            }
+          } else if (a.type === "improvement" && out.post_improved) {
+            // riparto dal post migliorato → riformulo come tema
+            if (!next.brief) next.brief = out.post_improved.slice(0, 500);
+          }
+        }
+        if (skillId === "post-improver") {
+          // arrivo da post → metto il post_text come post_originale
+          if (a.type === "post" && out.post_text && !next.post_originale) {
+            next.post_originale = out.post_text;
+          } else if (a.type === "improvement" && out.post_improved && !next.post_originale) {
+            next.post_originale = out.post_improved;
+          }
+        }
+        if (skillId === "hook-generator") {
+          // arrivo da post o improvement → riuso il tema o il testo come tema
+          if (!next.tema) {
+            if (a.type === "post" && inp.tema) next.tema = String(inp.tema);
+            else if (a.type === "post" && out.post_text) next.tema = out.post_text.slice(0, 200);
+            else if (a.type === "improvement" && out.post_improved) next.tema = out.post_improved.slice(0, 200);
+          }
+        }
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skillId, searchParams]);
+
   // v3.4.3 (P5): sync prospect-finder query quando l'ICP in DB arriva tardi.
   // Solo se query è ancora vuota (non sovrascrive input manuale).
   useEffect(() => {
@@ -2272,6 +2400,23 @@ export default function SkillPage() {
   const { profile, consumeSkillRun, updateRawProfileData, updateProfile } = useProfile();
   const { logRun } = useSkillRuns();
   const icpHook = useIcps();
+
+  // v3.8.1 (Tranche 1.5): content_assets — auto-save dopo generation + read assetId/fromAssetId.
+  const contentAssetsHook = useContentAssets();
+  const assetId = searchParams.get("assetId");
+  const fromAssetId = searchParams.get("fromAssetId");
+  const { asset: openedAsset } = useContentAssetById(assetId);
+  const { asset: parentAsset } = useContentAssetById(fromAssetId);
+
+  // Mappa skill.id → ContentAssetType. Solo per skill content writing.
+  const skillToAssetType = (sid: string | undefined): ContentAssetType | null => {
+    if (sid === "post-writer") return "post";
+    if (sid === "post-improver") return "improvement";
+    if (sid === "hook-generator") return "hook";
+    return null;
+  };
+  const currentAssetType = skillToAssetType(skill?.id);
+  const isContentSkill = currentAssetType !== null;
   // v3.7 Pezzo 2A: riapertura ricerca passata via ?searchId=
   const reopenSearchId = searchParams.get("searchId");
   const { data: reopenedSearch } = useSearchById(reopenSearchId);
@@ -2352,6 +2497,24 @@ export default function SkillPage() {
     }, 400);
     return () => clearTimeout(timer);
   }, [output, targetSection]);
+
+  // v3.8.1 (Tranche 1.5): reset stato al cambio skill (chiude bug "errore residuo tra schede").
+  useEffect(() => {
+    setOutput(null);
+    setError(null);
+    setLoadedFromCache(false);
+    setLastEffectiveSkillId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skill?.id]);
+
+  // v3.8.1: ?assetId=<uuid> → riapri asset esistente (read-only, niente API call).
+  useEffect(() => {
+    if (!isContentSkill) return;
+    if (!assetId || !openedAsset) return;
+    if (output) return;
+    setOutput(openedAsset.output as Record<string, unknown>);
+    setLoadedFromCache(true);
+  }, [isContentSkill, assetId, openedAsset, output]);
 
   // v3.7 Pezzo 2A: riapertura ricerca passata via ?searchId= (no API call).
   useEffect(() => {
@@ -2611,6 +2774,31 @@ export default function SkillPage() {
         }
       }
 
+      // v3.8.1 (Tranche 1.5): auto-save asset per skill content (post-writer, post-improver, hook-generator).
+      if (isContentSkill && currentAssetType && result.data && Object.keys(result.data).length > 0) {
+        const inputSnapshot = { ...payload };
+        // Rimuovi user_id dal snapshot (è già implicito nel row)
+        delete (inputSnapshot as any).user_id;
+        const created = await contentAssetsHook.create({
+          type: currentAssetType,
+          parent_id: fromAssetId || null,
+          input: inputSnapshot,
+          output: result.data as Record<string, unknown>,
+          title: autoTitleForAsset(
+            currentAssetType,
+            inputSnapshot,
+            result.data as Record<string, unknown>,
+          ),
+        });
+        if (created) {
+          // Aggiorna URL con ?assetId=<id> così se l'utente ricarica vede l'asset salvato.
+          const sp = new URLSearchParams(searchParams);
+          sp.delete("fromAssetId");
+          sp.set("assetId", created.id);
+          navigate(`/skill/${skill.id}?${sp.toString()}`, { replace: true });
+        }
+      }
+
       toast.success(`${skill.name} completata in ${(result.duration_ms / 1000).toFixed(1)}s`);
     } else {
       // v3.4.4: cast esplicito perché in alcune config TS strict il narrowing della discriminated
@@ -2725,7 +2913,9 @@ export default function SkillPage() {
         className={
           isProspectFinder
             ? "max-w-6xl mx-auto grid gap-6 lg:grid-cols-[1fr_320px]"
-            : "max-w-3xl mx-auto space-y-6"
+            : isContentSkill
+              ? "max-w-6xl mx-auto grid gap-6 lg:grid-cols-[1fr_300px]"
+              : "max-w-3xl mx-auto space-y-6"
         }
       >
         <div className="space-y-6 min-w-0">
@@ -2835,6 +3025,7 @@ export default function SkillPage() {
                 targetSection={targetSection}
                 onRegenerateSection={handleRegenerateSection}
                 regeneratingSection={regeneratingSection}
+                currentAssetId={assetId}
               />
             </CardContent>
           </Card>
@@ -2843,6 +3034,7 @@ export default function SkillPage() {
 
         {/* RIGHT RAIL — solo per prospect-finder */}
         {isProspectFinder && <RecentSearchesRail />}
+        {isContentSkill && currentAssetType && <ContentRail type={currentAssetType} />}
       </div>
     </AppLayout>
   );

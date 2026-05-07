@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Icps from "./pages/Icps";
 import Searches from "./pages/Searches";
 import Brand from "./pages/Brand";
+import Content from "./pages/Content";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -74,6 +75,11 @@ const App = () => (
             <Route path="/brand" element={
               <ProtectedRoute>
                 <Brand />
+              </ProtectedRoute>
+            } />
+            <Route path="/content" element={
+              <ProtectedRoute>
+                <Content />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
