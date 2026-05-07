@@ -5,7 +5,7 @@ import { SkillIcon } from "@/components/SkillIcon";
 import { SKILLS } from "@/lib/ember-types";
 import { useProfile } from "@/hooks/useProfile";
 import {
-  LayoutDashboard, Clock, Radar, Settings, LogOut, Target, History, Palette,
+  LayoutDashboard, Clock, Radar, Settings, LogOut, Target, History, Palette, Sparkles,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -85,6 +85,20 @@ export function AppSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu>
+                {layer.label === "CONTENT" && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/content"
+                        className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
+                        activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        {!collapsed && <span>I miei contenuti</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {layer.label === "PROSPECT" && (
                   <>
                     <SidebarMenuItem>
