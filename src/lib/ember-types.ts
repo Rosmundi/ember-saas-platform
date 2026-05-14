@@ -1,4 +1,8 @@
 // src/lib/ember-types.ts
+// v3.8.2 (Tranche 2 — Pezzo 4B): aggiunge skill di visual brief (testuali, niente generazione immagini)
+//   - visual-brief         → dato un post, 3 prompt AI-image (Midjourney/Flux/Ideogram) + concept + palette
+//   - carousel-brief       → storyboard slide-by-slide con copy slot + AI prompt per ogni slide
+//   - profile-banner-brief → banner LinkedIn 1584×396: concept + 3 prompt + palette
 // v3.8.0 (Tranche 1 — Pezzo 4A): aggiunge BrandKit + skill IDs nuove
 // (post-improver, hook-generator).
 
@@ -7,6 +11,9 @@ export type SkillId =
   | "post-writer"
   | "post-improver"
   | "hook-generator"
+  | "visual-brief"
+  | "carousel-brief"
+  | "profile-banner-brief"
   | "visual-post-builder"
   | "content-performance"
   | "icp-builder"
@@ -149,6 +156,36 @@ export const SKILLS: SkillConfig[] = [
     icon: "Zap",
     description:
       "5 hook diversi (curiosity, contrarian, data, story, question) per testare la prima riga del post.",
+    layer: "content",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
+    id: "visual-brief",
+    name: "Brief visual del post",
+    icon: "ImagePlus",
+    description:
+      "Dato un post, ottieni concept + palette + 3 prompt copia-incolla per generatori AI (Midjourney, Flux, Ideogram).",
+    layer: "content",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
+    id: "carousel-brief",
+    name: "Brief carosello",
+    icon: "Layers",
+    description:
+      "Storyboard slide-by-slide: titolo, body, copy slot e prompt AI per ogni slide. Da consegnare al designer o usare in Canva/Figma.",
+    layer: "content",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
+    id: "profile-banner-brief",
+    name: "Brief banner profilo",
+    icon: "Flag",
+    description:
+      "Banner LinkedIn 1584×396: concept + palette + 3 prompt copia-incolla per generatori AI. Allineato al tuo brand kit.",
     layer: "content",
     usesScraping: false,
     plans: ["trial", "base", "pro", "studio"],

@@ -47,6 +47,9 @@ import {
   Wand2,
   History as HistoryIcon,
   Target,
+  ImagePlus,
+  Layers,
+  Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -163,6 +166,30 @@ function buildPayload(
       return {
         profilo_business: bp,
         tema: values.tema,
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
+      };
+    case "visual-brief":
+      // v3.8.2 (Tranche 2): post → 3 prompt AI-image + concept + palette + dimensioni.
+      return {
+        profilo_business: bp,
+        post_text: values.post_text,
+        formato: (values.formato || "single").toLowerCase(), // single | square | story | reel-cover
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
+      };
+    case "carousel-brief":
+      // v3.8.2 (Tranche 2): tema (+ post opzionale) → storyboard N slide con copy slot + prompt AI per slide.
+      return {
+        profilo_business: bp,
+        tema: values.tema,
+        post_text: values.post_text || "",
+        num_slide: Number(values.num_slide || 8),
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
+      };
+    case "profile-banner-brief":
+      // v3.8.2 (Tranche 2): profilo_business + brand_kit → banner 1584×396 con concept + palette + 3 prompt.
+      return {
+        profilo_business: bp,
+        obiettivo: values.obiettivo || "attrarre clienti B2B",
         brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
       };
     case "visual-post-builder":
@@ -752,15 +779,32 @@ function SkillOutput({
                     </Button>
                   </>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled
-                  className="border-border/50 opacity-50 cursor-not-allowed"
-                  title="Disponibile a breve in Tranche 2 (visual brief)"
-                >
-                  Visual brief — presto
-                </Button>
+                {currentAssetId && (
+                  <>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="border-border/50 hover:border-primary/50 hover:text-primary"
+                    >
+                      <Link to={`/skill/visual-brief?fromAssetId=${currentAssetId}`}>
+                        <ImagePlus className="h-3 w-3 mr-1" />
+                        Brief visual
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="border-border/50 hover:border-primary/50 hover:text-primary"
+                    >
+                      <Link to={`/skill/carousel-brief?fromAssetId=${currentAssetId}`}>
+                        <Layers className="h-3 w-3 mr-1" />
+                        Brief carosello
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -1017,6 +1061,373 @@ function SkillOutput({
               </Link>
             </Button>
           </div>
+        )}
+      </div>
+    );
+  }
+
+  // v3.8.2 (Tranche 2): visual-brief renderer
+  if (skillId === "visual-brief") {
+    const prompts = data.prompts || {};
+    const palette: string[] = Array.isArray(data.palette) ? data.palette : [];
+    const dims = data.dimensions || {};
+    const styleKw: string[] = Array.isArray(data.style_keywords) ? data.style_keywords : [];
+    const dos: string[] = Array.isArray(data.do_dont?.do) ? data.do_dont.do : [];
+    const donts: string[] = Array.isArray(data.do_dont?.dont) ? data.do_dont.dont : [];
+    const PromptRow = ({ tool, text }: { tool: string; text: string }) => (
+      <Card className="bg-surface/50 border-border/30">
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Badge className="bg-primary/10 text-primary border-0 uppercase tracking-wider text-[10px]">
+              {tool}
+            </Badge>
+            <CopyButton text={text} />
+          </div>
+          <p className="text-sm font-mono whitespace-pre-wrap leading-relaxed">{text}</p>
+        </CardContent>
+      </Card>
+    );
+    return (
+      <div className="space-y-5 animate-in">
+        {/* Concept + mood */}
+        {(data.concept || data.mood) && (
+          <Card className="bg-card border-primary/30">
+            <CardContent className="p-5 space-y-2">
+              <Badge className="bg-primary text-primary-foreground border-0">Concept</Badge>
+              {data.concept && <p className="text-base font-medium leading-relaxed">{data.concept}</p>}
+              {data.mood && (
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Mood:</span> {data.mood}
+                </p>
+              )}
+              {styleKw.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {styleKw.map((k) => (
+                    <Badge key={k} variant="outline" className="border-border/50 text-[10px]">
+                      {k}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dimensions + palette */}
+        <div className="grid sm:grid-cols-2 gap-3">
+          {dims.width && (
+            <Card className="bg-surface/50 border-border/30">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Dimensioni</p>
+                <p className="text-sm font-medium">
+                  {dims.width}×{dims.height} {dims.ratio && <span className="text-muted-foreground">· {dims.ratio}</span>}
+                </p>
+                {dims.label && <p className="text-xs text-muted-foreground mt-1">{dims.label}</p>}
+              </CardContent>
+            </Card>
+          )}
+          {palette.length > 0 && (
+            <Card className="bg-surface/50 border-border/30">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-2">Palette</p>
+                <div className="flex flex-wrap gap-2">
+                  {palette.map((c) => (
+                    <div key={c} className="flex items-center gap-1.5">
+                      <div
+                        className="w-7 h-7 rounded-md shadow-inner border border-border/30"
+                        style={{ background: c }}
+                      />
+                      <span className="text-[11px] font-mono text-muted-foreground">{c}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* 3 prompt copia-incolla */}
+        <div>
+          <h3 className="font-semibold text-sm mb-3">Prompt pronti per i generatori AI</h3>
+          <div className="space-y-3">
+            {prompts.midjourney && <PromptRow tool="Midjourney" text={prompts.midjourney} />}
+            {prompts.flux_or_ideogram && <PromptRow tool="Flux / Ideogram" text={prompts.flux_or_ideogram} />}
+            {prompts.dalle_or_gpt_image && <PromptRow tool="DALL·E / gpt-image-1" text={prompts.dalle_or_gpt_image} />}
+          </div>
+        </div>
+
+        {/* Do / Don't */}
+        {(dos.length > 0 || donts.length > 0) && (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {dos.length > 0 && (
+              <Card className="bg-emerald-500/5 border-emerald-500/20">
+                <CardContent className="p-4">
+                  <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-2">Do</p>
+                  <ul className="space-y-1">
+                    {dos.map((d, i) => (
+                      <li key={i} className="text-xs text-muted-foreground leading-relaxed">
+                        · {d}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+            {donts.length > 0 && (
+              <Card className="bg-destructive/5 border-destructive/20">
+                <CardContent className="p-4">
+                  <p className="text-xs text-destructive font-semibold uppercase tracking-wider mb-2">Don't</p>
+                  <ul className="space-y-1">
+                    {donts.map((d, i) => (
+                      <li key={i} className="text-xs text-muted-foreground leading-relaxed">
+                        · {d}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Canva fallback */}
+        {data.fallback_canva_recipe && (
+          <Card className="bg-surface/30 border-border/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
+                Senza AI? Apri Canva
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{data.fallback_canva_recipe}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // v3.8.2 (Tranche 2): carousel-brief renderer
+  if (skillId === "carousel-brief") {
+    const cover = data.cover || null;
+    const slides: any[] = Array.isArray(data.slides) ? data.slides : [];
+    const cta = data.cta_slide || null;
+    const tips: string[] = Array.isArray(data.design_tips) ? data.design_tips : [];
+    const SlideCard = ({ n, headline, body, copy_slot, visual_hint, ai_prompt, kind }: any) => (
+      <Card
+        className={`${
+          kind === "cover"
+            ? "bg-primary/5 border-primary/30"
+            : kind === "cta"
+              ? "bg-amber-500/5 border-amber-500/30"
+              : "bg-surface/50 border-border/30"
+        }`}
+      >
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Badge
+              className={
+                kind === "cover"
+                  ? "bg-primary text-primary-foreground border-0"
+                  : kind === "cta"
+                    ? "bg-amber-500 text-amber-50 border-0"
+                    : "bg-muted text-muted-foreground border-0"
+              }
+            >
+              {kind === "cover" ? "Cover" : kind === "cta" ? "CTA" : `Slide ${n}`}
+            </Badge>
+            {visual_hint && (
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{visual_hint}</span>
+            )}
+          </div>
+          {headline && <p className="text-sm font-bold leading-snug">{headline}</p>}
+          {body && <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{body}</p>}
+          {copy_slot && (
+            <div className="border-l-2 border-primary/40 bg-background/40 p-2 rounded-r">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Copy da incollare</p>
+              <p className="text-xs font-medium whitespace-pre-wrap">{copy_slot}</p>
+            </div>
+          )}
+          {ai_prompt && (
+            <div className="bg-background/40 border border-border/30 rounded p-2">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">AI prompt sfondo</p>
+                <CopyButton text={ai_prompt} />
+              </div>
+              <p className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">{ai_prompt}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+    return (
+      <div className="space-y-5 animate-in">
+        {data.title && (
+          <Card className="bg-card border-primary/30">
+            <CardContent className="p-5">
+              <Badge className="bg-primary text-primary-foreground border-0 mb-2">Carosello</Badge>
+              <p className="text-base font-semibold leading-relaxed">{data.title}</p>
+              {data.summary && <p className="text-sm text-muted-foreground mt-1">{data.summary}</p>}
+            </CardContent>
+          </Card>
+        )}
+        <div className="space-y-3">
+          {cover && (
+            <SlideCard
+              kind="cover"
+              headline={cover.title || cover.headline}
+              body={cover.subtitle || cover.body}
+              copy_slot={cover.copy_slot}
+              visual_hint={cover.visual_hint}
+              ai_prompt={cover.ai_prompt}
+            />
+          )}
+          {slides.map((s, i) => (
+            <SlideCard
+              key={i}
+              kind="body"
+              n={s.n ?? i + 2}
+              headline={s.headline || s.title}
+              body={s.body}
+              copy_slot={s.copy_slot}
+              visual_hint={s.visual_hint}
+              ai_prompt={s.ai_prompt}
+            />
+          ))}
+          {cta && (
+            <SlideCard
+              kind="cta"
+              headline={cta.headline || cta.title}
+              body={cta.body || cta.cta_text}
+              copy_slot={cta.copy_slot || cta.cta_text}
+              visual_hint={cta.visual_hint}
+              ai_prompt={cta.ai_prompt}
+            />
+          )}
+        </div>
+        {tips.length > 0 && (
+          <Card className="bg-surface/30 border-border/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2">Design tips</p>
+              <ul className="space-y-1">
+                {tips.map((t, i) => (
+                  <li key={i} className="text-xs text-muted-foreground leading-relaxed">
+                    · {t}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  // v3.8.2 (Tranche 2): profile-banner-brief renderer
+  if (skillId === "profile-banner-brief") {
+    const prompts = data.prompts || {};
+    const palette: string[] = Array.isArray(data.palette) ? data.palette : [];
+    const dims = data.dimensions || { width: 1584, height: 396, ratio: "4:1", label: "Banner LinkedIn" };
+    const PromptRow = ({ tool, text }: { tool: string; text: string }) => (
+      <Card className="bg-surface/50 border-border/30">
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Badge className="bg-primary/10 text-primary border-0 uppercase tracking-wider text-[10px]">
+              {tool}
+            </Badge>
+            <CopyButton text={text} />
+          </div>
+          <p className="text-sm font-mono whitespace-pre-wrap leading-relaxed">{text}</p>
+        </CardContent>
+      </Card>
+    );
+    return (
+      <div className="space-y-5 animate-in">
+        {/* Concept */}
+        {(data.concept || data.mood) && (
+          <Card className="bg-card border-primary/30">
+            <CardContent className="p-5 space-y-2">
+              <Badge className="bg-primary text-primary-foreground border-0">Concept banner</Badge>
+              {data.concept && <p className="text-base font-medium leading-relaxed">{data.concept}</p>}
+              {data.mood && (
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Mood:</span> {data.mood}
+                </p>
+              )}
+              {(data.headline_text || data.subline_text) && (
+                <div className="border-l-2 border-primary/40 bg-background/40 p-3 rounded-r mt-2">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+                    Testo sovrimpresso suggerito
+                  </p>
+                  {data.headline_text && (
+                    <p className="text-sm font-bold leading-snug">{data.headline_text}</p>
+                  )}
+                  {data.subline_text && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{data.subline_text}</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dimensions + palette + safe zone */}
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Card className="bg-surface/50 border-border/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground mb-1">Dimensioni</p>
+              <p className="text-sm font-medium">
+                {dims.width}×{dims.height} {dims.ratio && <span className="text-muted-foreground">· {dims.ratio}</span>}
+              </p>
+              {dims.label && <p className="text-xs text-muted-foreground mt-1">{dims.label}</p>}
+            </CardContent>
+          </Card>
+          {palette.length > 0 && (
+            <Card className="bg-surface/50 border-border/30">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-2">Palette</p>
+                <div className="flex flex-wrap gap-2">
+                  {palette.map((c) => (
+                    <div key={c} className="flex items-center gap-1.5">
+                      <div
+                        className="w-7 h-7 rounded-md shadow-inner border border-border/30"
+                        style={{ background: c }}
+                      />
+                      <span className="text-[11px] font-mono text-muted-foreground">{c}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+        {data.safe_zone_note && (
+          <Card className="bg-amber-500/5 border-amber-500/20">
+            <CardContent className="p-4">
+              <p className="text-xs text-amber-400 font-semibold uppercase tracking-wider mb-1">Attenzione: safe zone</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{data.safe_zone_note}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Prompts */}
+        <div>
+          <h3 className="font-semibold text-sm mb-3">Prompt pronti per i generatori AI</h3>
+          <div className="space-y-3">
+            {prompts.midjourney && <PromptRow tool="Midjourney" text={prompts.midjourney} />}
+            {prompts.flux_or_ideogram && <PromptRow tool="Flux / Ideogram" text={prompts.flux_or_ideogram} />}
+            {prompts.dalle_or_gpt_image && <PromptRow tool="DALL·E / gpt-image-1" text={prompts.dalle_or_gpt_image} />}
+          </div>
+        </div>
+
+        {/* Canva fallback */}
+        {data.fallback_canva_recipe && (
+          <Card className="bg-surface/30 border-border/30">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
+                Senza AI? Apri Canva
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{data.fallback_canva_recipe}</p>
+            </CardContent>
+          </Card>
         )}
       </div>
     );
@@ -1971,6 +2382,19 @@ function SkillForm({
     if (skillId === "hook-generator") {
       init.tema = searchParams.get("tema") || "";
     }
+    // v3.8.2 (Tranche 2): visual-brief + carousel-brief pre-compilabili da query string.
+    if (skillId === "visual-brief") {
+      init.post_text = searchParams.get("post") || "";
+      init.formato = searchParams.get("formato") || "single";
+    }
+    if (skillId === "carousel-brief") {
+      init.tema = searchParams.get("tema") || "";
+      init.post_text = searchParams.get("post") || "";
+      init.num_slide = searchParams.get("num_slide") || "8";
+    }
+    if (skillId === "profile-banner-brief") {
+      init.obiettivo = searchParams.get("obiettivo") || "";
+    }
     // post-improver: nessun init particolare; l'utente incolla manualmente.
     // v3.4.2 fix (P1): precompila ICP builder con target dal profilo analizzato.
     // Priorità: query string ?description= > raw_profile_data.target_buyer.
@@ -2009,7 +2433,18 @@ function SkillForm({
   //   - post → post-improver: init.post_originale = post.output.post_text
   //   - post → hook-generator: init.tema = post.input.tema (riusa lo stesso tema)
   useEffect(() => {
-    if (!["post-writer", "post-improver", "hook-generator"].includes(skillId)) return;
+    if (
+      ![
+        "post-writer",
+        "post-improver",
+        "hook-generator",
+        // v3.8.2 (Tranche 2): brief visuali pre-compilabili da un post sorgente
+        "visual-brief",
+        "carousel-brief",
+        "profile-banner-brief",
+      ].includes(skillId)
+    )
+      return;
     const fromId = searchParams.get("fromAssetId");
     if (!fromId) return;
     let cancelled = false;
@@ -2053,6 +2488,25 @@ function SkillForm({
             else if (a.type === "improvement" && out.post_improved) next.tema = out.post_improved.slice(0, 200);
           }
         }
+        // v3.8.2 (Tranche 2)
+        if (skillId === "visual-brief") {
+          // post → uso post_text come input
+          if (!next.post_text) {
+            if (a.type === "post" && out.post_text) next.post_text = out.post_text;
+            else if (a.type === "improvement" && out.post_improved) next.post_text = out.post_improved;
+          }
+        }
+        if (skillId === "carousel-brief") {
+          // post → tema + post_text per contesto
+          if (!next.tema) {
+            if (a.type === "post" && inp.tema) next.tema = String(inp.tema);
+            else if (a.type === "improvement" && out.post_improved) next.tema = out.post_improved.slice(0, 200);
+          }
+          if (!next.post_text && a.type === "post" && out.post_text) {
+            next.post_text = out.post_text;
+          }
+        }
+        // profile-banner-brief: non parte da un asset esistente (input = profilo+brand_kit).
         return next;
       });
     })();
@@ -2194,6 +2648,111 @@ function SkillForm({
           />
           <p className="text-[11px] text-muted-foreground mt-1">
             Genereremo 5 hook (prima riga del post) con angoli diversi: curiosity, contrarian, data, story, question.
+          </p>
+        </div>
+        {submitBtn}
+      </div>
+    );
+  }
+  // v3.8.2 (Tranche 2): visual-brief form
+  if (skillId === "visual-brief") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Post LinkedIn da illustrare
+          </label>
+          <Textarea
+            placeholder="Incolla qui il post completo (o solo l'hook + concetto principale)..."
+            value={values.post_text || ""}
+            onChange={(e) => set("post_text", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={8}
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Niente generazione di immagini reali. Ti diamo concept, palette e 3 prompt copia-incolla per generatori AI.
+          </p>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Formato visual</label>
+          <Select value={values.formato || "single"} onValueChange={(v) => set("formato", v)}>
+            <SelectTrigger className="bg-surface border-border/50">
+              <SelectValue placeholder="Formato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="single">Singolo (1200×1200) — feed quadrato</SelectItem>
+              <SelectItem value="landscape">Landscape (1200×627) — feed orizzontale</SelectItem>
+              <SelectItem value="portrait">Portrait (1080×1350) — più visibile in feed</SelectItem>
+              <SelectItem value="story">Story / Reel cover (1080×1920)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {submitBtn}
+      </div>
+    );
+  }
+  // v3.8.2 (Tranche 2): carousel-brief form
+  if (skillId === "carousel-brief") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Tema / argomento del carosello</label>
+          <Textarea
+            placeholder="Es. 'I 5 errori più comuni di chi sceglie il primo CRM' — sii specifico, è il filo conduttore dello storyboard."
+            value={values.tema || ""}
+            onChange={(e) => set("tema", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={3}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Post sorgente <span className="text-muted-foreground/60">(opzionale, dà più contesto)</span>
+          </label>
+          <Textarea
+            placeholder="Se hai già un post sul tema, incollalo qui per allineare lo storyboard."
+            value={values.post_text || ""}
+            onChange={(e) => set("post_text", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={4}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Numero slide (incluse cover e CTA)</label>
+          <Select value={values.num_slide || "8"} onValueChange={(v) => set("num_slide", v)}>
+            <SelectTrigger className="bg-surface border-border/50">
+              <SelectValue placeholder="N slide" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5 slide — breve</SelectItem>
+              <SelectItem value="7">7 slide — standard</SelectItem>
+              <SelectItem value="8">8 slide — consigliato</SelectItem>
+              <SelectItem value="10">10 slide — esteso</SelectItem>
+              <SelectItem value="12">12 slide — long form</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {submitBtn}
+      </div>
+    );
+  }
+  // v3.8.2 (Tranche 2): profile-banner-brief form
+  if (skillId === "profile-banner-brief") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Obiettivo del banner <span className="text-muted-foreground/60">(opzionale)</span>
+          </label>
+          <Textarea
+            placeholder="Es. 'Attrarre PMI manifatturiere in cerca di un sales partner B2B' — più sei specifico, più mirato sarà il concept."
+            value={values.obiettivo || ""}
+            onChange={(e) => set("obiettivo", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary transition-colors"
+            rows={3}
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Banner LinkedIn 1584×396. Usiamo il tuo profilo business + brand kit. Output: concept + palette + 3 prompt copia-incolla per generatori AI.
           </p>
         </div>
         {submitBtn}
@@ -2413,6 +2972,10 @@ export default function SkillPage() {
     if (sid === "post-writer") return "post";
     if (sid === "post-improver") return "improvement";
     if (sid === "hook-generator") return "hook";
+    // v3.8.2 (Tranche 2): brief visuali
+    if (sid === "visual-brief") return "visual_brief";
+    if (sid === "carousel-brief") return "carousel_brief";
+    if (sid === "profile-banner-brief") return "banner_brief";
     return null;
   };
   const currentAssetType = skillToAssetType(skill?.id);

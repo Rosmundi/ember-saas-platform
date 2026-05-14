@@ -36,6 +36,10 @@ const ALLOWED_SKILLS = new Set<string>([
   "post-writer",
   "post-improver",
   "hook-generator",
+  // v3.8.2 (Tranche 2, Pezzo 4B) — visual brief skills (testuali, niente generazione immagini)
+  "visual-brief",
+  "carousel-brief",
+  "profile-banner-brief",
 ]);
 
 const SEARCH_CONSUMING_SKILLS = new Set<string>([
