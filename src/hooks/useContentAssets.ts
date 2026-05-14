@@ -1,9 +1,11 @@
 // src/hooks/useContentAssets.ts
 // ============================================================================
-// Hook per CRUD asset di content (tabella `content_assets`, migration 013).
+// Hook per CRUD asset di content (tabella `content_assets`, migration 013+014).
 //
-// Discriminator: `type` ∈ 'post' | 'improvement' | 'hook' | 'visual_brief' | 'carousel_brief'.
-// `parent_id` collega gli asset in chain (post → improvement, post → hook, ecc.).
+// Discriminator: `type` ∈ 'post' | 'improvement' | 'hook' | 'visual_brief'
+//                       | 'carousel_brief' | 'banner_brief'.
+// `parent_id` collega gli asset in chain (post → improvement, post → hook,
+// post → visual_brief, post → carousel_brief, ecc.).
 // Title auto-generato dall'app prima dell'INSERT.
 //
 // Pattern UX:
@@ -22,7 +24,8 @@ export type ContentAssetType =
   | "improvement"
   | "hook"
   | "visual_brief"
-  | "carousel_brief";
+  | "carousel_brief"
+  | "banner_brief";
 
 export interface ContentAssetRow {
   id: string;
@@ -87,10 +90,21 @@ export function autoTitleForAsset(
       return inp.post_text
         ? `Visual brief: "${truncateForTitle(String(inp.post_text), 40)}"`
         : "Visual brief senza titolo";
-    case "carousel_brief":
-      return inp.tema
-        ? `Carousel: "${truncateForTitle(String(inp.tema), 40)}"`
+    case "carousel_brief": {
+      const seed = inp.tema || inp.post_text || "";
+      return seed
+        ? `Carousel: "${truncateForTitle(String(seed), 40)}"`
         : "Carousel senza titolo";
+    }
+    case "banner_brief": {
+      // Per il banner usiamo il concept generato (output) se presente,
+      // altrimenti il nome dall'autore (input.profilo_business.nome).
+      const concept = (output as any).concept;
+      if (concept) return truncateForTitle(`Banner: ${concept}`, 60);
+      const bizNome = inp.profilo_business?.nome;
+      if (bizNome) return `Banner profilo di ${truncateForTitle(String(bizNome), 30)}`;
+      return "Banner profilo senza titolo";
+    }
     default:
       return "Asset senza titolo";
   }
@@ -313,6 +327,8 @@ export function contentTypeLabel(type: ContentAssetType): string {
       return "Visual brief";
     case "carousel_brief":
       return "Carousel brief";
+    case "banner_brief":
+      return "Banner brief";
     default:
       return type;
   }
@@ -330,6 +346,8 @@ export function contentTypeColor(type: ContentAssetType): string {
       return "bg-purple-500/15 text-purple-400 border-purple-500/30";
     case "carousel_brief":
       return "bg-blue-500/15 text-blue-400 border-blue-500/30";
+    case "banner_brief":
+      return "bg-pink-500/15 text-pink-400 border-pink-500/30";
     default:
       return "bg-muted text-muted-foreground border-border/30";
   }
@@ -338,6 +356,9 @@ export function contentTypeColor(type: ContentAssetType): string {
 /**
  * Mappatura type → skillId della skill page che lo gestisce.
  * Usata per costruire link `?assetId=<id>` o `?fromAssetId=<id>`.
+ *
+ * v3.8.2 (Tranche 2): i 3 brief hanno la loro skill dedicata; non puntano più
+ * tutti a `visual-post-builder` come in v3.8.1.
  */
 export function contentTypeToSkillId(type: ContentAssetType): string {
   switch (type) {
@@ -348,9 +369,11 @@ export function contentTypeToSkillId(type: ContentAssetType): string {
     case "hook":
       return "hook-generator";
     case "visual_brief":
-      return "visual-post-builder";
+      return "visual-brief";
     case "carousel_brief":
-      return "visual-post-builder";
+      return "carousel-brief";
+    case "banner_brief":
+      return "profile-banner-brief";
     default:
       return "post-writer";
   }
