@@ -192,10 +192,7 @@ function buildPayload(
         obiettivo: values.obiettivo || "attrarre clienti B2B",
         brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || null,
       };
-    case "visual-post-builder":
-      return { post_text: values.post, formato_visual: (values.style || "carousel").toLowerCase() };
-    case "content-performance":
-      return { posts: [], periodo: "30d" };
+    // v3.8.3: rimossi i case di visual-post-builder e content-performance (skill obsolete).
     case "icp-builder":
       return { profilo_business: bp, obiettivo_commerciale: values.description };
     case "prospect-finder":
@@ -798,7 +795,7 @@ function SkillOutput({
                       size="sm"
                       className="border-border/50 hover:border-primary/50 hover:text-primary"
                     >
-                      <Link to={`/skill/carousel-brief?fromAssetId=${currentAssetId}`}>
+                      <Link to={`/skill/visual-brief?tab=carousel&fromAssetId=${currentAssetId}`}>
                         <Layers className="h-3 w-3 mr-1" />
                         Brief carosello
                       </Link>
@@ -1066,8 +1063,10 @@ function SkillOutput({
     );
   }
 
-  // v3.8.2 (Tranche 2): visual-brief renderer
-  if (skillId === "visual-brief") {
+  // v3.8.2/v3.8.3 (Tranche 2.1): renderer unificato per visual-brief.
+  // skillId può essere "visual-brief" (output single) o "carousel-brief" (output carosello,
+  // dispatch dal tab Carosello). Il branch carosello è subito sotto e gestisce data.slides.
+  if (skillId === "visual-brief" && !Array.isArray(data.slides)) {
     const prompts = data.prompts || {};
     const palette: string[] = Array.isArray(data.palette) ? data.palette : [];
     const dims = data.dimensions || {};
@@ -1205,8 +1204,10 @@ function SkillOutput({
     );
   }
 
-  // v3.8.2 (Tranche 2): carousel-brief renderer
-  if (skillId === "carousel-brief") {
+  // v3.8.2/v3.8.3 (Tranche 2.1): renderer carosello. Triggera quando:
+  //   - skillId === "carousel-brief" (output fresh, dispatch dalla tab Carosello)
+  //   - skillId === "visual-brief" ma l'asset salvato ha data.slides (apertura assetId di un carousel_brief)
+  if (skillId === "carousel-brief" || (skillId === "visual-brief" && Array.isArray(data.slides))) {
     const cover = data.cover || null;
     const slides: any[] = Array.isArray(data.slides) ? data.slides : [];
     const cta = data.cta_slide || null;
@@ -1433,107 +1434,7 @@ function SkillOutput({
     );
   }
 
-  if (skillId === "visual-post-builder") {
-    return (
-      <div className="space-y-5 animate-in">
-        {(data.canva_query || data.cover_slide) && (
-          <div>
-            <h3 className="font-semibold mb-3">Struttura Visual</h3>
-            {data.cover_slide && (
-              <div className="bg-surface/50 border border-border/30 rounded-xl p-4 mb-2">
-                <p className="text-sm font-medium">{data.cover_slide.title}</p>
-                <p className="text-xs text-muted-foreground">{data.cover_slide.body}</p>
-              </div>
-            )}
-            {data.slide_content?.map((s: any, i: number) => (
-              <div key={i} className="bg-surface/50 border border-border/30 rounded-xl p-4 mb-2">
-                <p className="text-sm">
-                  <span className="text-primary mr-2">{i + 1}.</span>
-                  {s.title || s}
-                </p>
-                {s.body && <p className="text-xs text-muted-foreground mt-1">{s.body}</p>}
-              </div>
-            ))}
-            {data.cta_slide && (
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                <p className="text-sm font-medium">{data.cta_slide.title}</p>
-                <p className="text-xs text-muted-foreground">{data.cta_slide.cta_text}</p>
-              </div>
-            )}
-          </div>
-        )}
-        {data.midjourney_prompt && (
-          <div>
-            <h3 className="font-semibold mb-3">AI Image Prompt</h3>
-            <div className="bg-surface/50 border border-border/30 rounded-xl p-4">
-              <p className="text-sm font-mono">{data.midjourney_prompt}</p>
-              <div className="mt-2">
-                <CopyButton text={data.midjourney_prompt} />
-              </div>
-            </div>
-          </div>
-        )}
-        {data.palette && (
-          <div>
-            <h3 className="font-semibold mb-3">Palette</h3>
-            <div className="flex gap-3">
-              {data.palette.map((c: string) => (
-                <div key={c} className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-lg shadow-inner" style={{ background: c }} />
-                  <span className="text-xs font-mono text-muted-foreground">{c}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (skillId === "content-performance") {
-    return (
-      <div className="space-y-5 animate-in">
-        {data.score != null && (
-          <div className="text-center py-2">
-            <ScoreBadge score={data.score} size="lg" className="mx-auto" />
-          </div>
-        )}
-        {data.patterns && (
-          <div className="grid sm:grid-cols-3 gap-3">
-            {Object.entries(data.patterns).map(([k, v]) => (
-              <Card key={k} className="bg-surface/50 border-border/30">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground mb-1">{k.replace(/_/g, " ")}</p>
-                  <p className="text-sm font-medium">{String(v)}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-        {data.recommendations && (
-          <div>
-            <h3 className="font-semibold text-sm mb-2">Raccomandazioni</h3>
-            {data.recommendations.map((r: string, i: number) => (
-              <p key={i} className="text-sm text-muted-foreground mb-1 flex items-start gap-2">
-                <span className="text-primary">{i + 1}.</span>
-                {typeof r === "string" ? r : JSON.stringify(r)}
-              </p>
-            ))}
-          </div>
-        )}
-        {data.next_30d_plan && (
-          <div>
-            <h3 className="font-semibold text-sm mb-2">Piano prossimi 30 giorni</h3>
-            {data.next_30d_plan.map((a: string, i: number) => (
-              <p key={i} className="text-sm text-muted-foreground mb-1">
-                → {typeof a === "string" ? a : JSON.stringify(a)}
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+  // v3.8.3: rimossi i renderer di visual-post-builder e content-performance (skill obsolete).
 
   if (skillId === "icp-builder") {
     // v3.4.2 fix (P3): renderer tipizzato per gestire strutture nested (oggetti, array di oggetti).
@@ -2344,7 +2245,7 @@ function SkillForm({
     if (skillId === "auto-profile-setup") {
       init.url = searchParams.get("url") || profile?.linkedin_url || "";
     }
-    if (skillId === "visual-post-builder") init.post = searchParams.get("post") || "";
+    // v3.8.3: visual-post-builder rimossa.
     // v3.4.3 (P5): prospect-finder — priorità: query string > DB (profile.raw_profile_data.icp_current) > localStorage.
     // DB è la fonte persistente (refresh-safe, cross-device). localStorage è fallback cache.
     if (skillId === "prospect-finder") {
@@ -2382,14 +2283,12 @@ function SkillForm({
     if (skillId === "hook-generator") {
       init.tema = searchParams.get("tema") || "";
     }
-    // v3.8.2 (Tranche 2): visual-brief + carousel-brief pre-compilabili da query string.
+    // v3.8.3 (Tranche 2.1): visual-brief unifica anche carousel. Tab via ?tab=single|carousel.
     if (skillId === "visual-brief") {
+      init.tab = searchParams.get("tab") || "single";
       init.post_text = searchParams.get("post") || "";
       init.formato = searchParams.get("formato") || "single";
-    }
-    if (skillId === "carousel-brief") {
       init.tema = searchParams.get("tema") || "";
-      init.post_text = searchParams.get("post") || "";
       init.num_slide = searchParams.get("num_slide") || "8";
     }
     if (skillId === "profile-banner-brief") {
@@ -2438,9 +2337,8 @@ function SkillForm({
         "post-writer",
         "post-improver",
         "hook-generator",
-        // v3.8.2 (Tranche 2): brief visuali pre-compilabili da un post sorgente
+        // v3.8.3 (Tranche 2.1): visual-brief unifica anche il caso carosello.
         "visual-brief",
-        "carousel-brief",
         "profile-banner-brief",
       ].includes(skillId)
     )
@@ -2488,22 +2386,25 @@ function SkillForm({
             else if (a.type === "improvement" && out.post_improved) next.tema = out.post_improved.slice(0, 200);
           }
         }
-        // v3.8.2 (Tranche 2)
+        // v3.8.3 (Tranche 2.1): visual-brief unificato — pre-fill diverso per tab single|carousel.
         if (skillId === "visual-brief") {
-          // post → uso post_text come input
+          // Detect target tab: query string ?tab=... ha priorità; altrimenti deduce dall'asset
+          // di partenza (se è un carousel_brief, default carousel; altrimenti single).
+          if (!next.tab) {
+            const requestedTab = searchParams.get("tab");
+            if (requestedTab) next.tab = requestedTab;
+            else if (a.type === "carousel_brief") next.tab = "carousel";
+            else next.tab = "single";
+          }
+          // post_text (utile sia per tab single che per il "post sorgente" in carousel)
           if (!next.post_text) {
             if (a.type === "post" && out.post_text) next.post_text = out.post_text;
             else if (a.type === "improvement" && out.post_improved) next.post_text = out.post_improved;
           }
-        }
-        if (skillId === "carousel-brief") {
-          // post → tema + post_text per contesto
+          // tema (solo per tab carousel)
           if (!next.tema) {
             if (a.type === "post" && inp.tema) next.tema = String(inp.tema);
             else if (a.type === "improvement" && out.post_improved) next.tema = out.post_improved.slice(0, 200);
-          }
-          if (!next.post_text && a.type === "post" && out.post_text) {
-            next.post_text = out.post_text;
           }
         }
         // profile-banner-brief: non parte da un asset esistente (input = profilo+brand_kit).
@@ -2654,84 +2555,95 @@ function SkillForm({
       </div>
     );
   }
-  // v3.8.2 (Tranche 2): visual-brief form
+  // v3.8.3 (Tranche 2.1): visual-brief form unificato con tab Singolo | Carosello.
+  // values.tab: "single" (default) | "carousel". Il dispatch a n8n usa due webhook diversi
+  // (ember/visual-brief vs ember/carousel-brief), gestiti in handleSubmit.
   if (skillId === "visual-brief") {
+    const tab = values.tab || "single";
     return (
       <div className="space-y-4">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            Post LinkedIn da illustrare
-          </label>
-          <Textarea
-            placeholder="Incolla qui il post completo (o solo l'hook + concetto principale)..."
-            value={values.post_text || ""}
-            onChange={(e) => set("post_text", e.target.value)}
-            className="bg-surface border-border/50 focus:border-primary transition-colors"
-            rows={8}
-          />
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Niente generazione di immagini reali. Ti diamo concept, palette e 3 prompt copia-incolla per generatori AI.
-          </p>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Formato visual</label>
-          <Select value={values.formato || "single"} onValueChange={(v) => set("formato", v)}>
-            <SelectTrigger className="bg-surface border-border/50">
-              <SelectValue placeholder="Formato" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="single">Singolo (1200×1200) — feed quadrato</SelectItem>
-              <SelectItem value="landscape">Landscape (1200×627) — feed orizzontale</SelectItem>
-              <SelectItem value="portrait">Portrait (1080×1350) — più visibile in feed</SelectItem>
-              <SelectItem value="story">Story / Reel cover (1080×1920)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {submitBtn}
-      </div>
-    );
-  }
-  // v3.8.2 (Tranche 2): carousel-brief form
-  if (skillId === "carousel-brief") {
-    return (
-      <div className="space-y-4">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Tema / argomento del carosello</label>
-          <Textarea
-            placeholder="Es. 'I 5 errori più comuni di chi sceglie il primo CRM' — sii specifico, è il filo conduttore dello storyboard."
-            value={values.tema || ""}
-            onChange={(e) => set("tema", e.target.value)}
-            className="bg-surface border-border/50 focus:border-primary transition-colors"
-            rows={3}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            Post sorgente <span className="text-muted-foreground/60">(opzionale, dà più contesto)</span>
-          </label>
-          <Textarea
-            placeholder="Se hai già un post sul tema, incollalo qui per allineare lo storyboard."
-            value={values.post_text || ""}
-            onChange={(e) => set("post_text", e.target.value)}
-            className="bg-surface border-border/50 focus:border-primary transition-colors"
-            rows={4}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Numero slide (incluse cover e CTA)</label>
-          <Select value={values.num_slide || "8"} onValueChange={(v) => set("num_slide", v)}>
-            <SelectTrigger className="bg-surface border-border/50">
-              <SelectValue placeholder="N slide" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="5">5 slide — breve</SelectItem>
-              <SelectItem value="7">7 slide — standard</SelectItem>
-              <SelectItem value="8">8 slide — consigliato</SelectItem>
-              <SelectItem value="10">10 slide — esteso</SelectItem>
-              <SelectItem value="12">12 slide — long form</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Tabs value={tab} onValueChange={(v) => set("tab", v)}>
+          <TabsList className="grid grid-cols-2 w-full bg-surface/50">
+            <TabsTrigger value="single">
+              <ImagePlus className="h-3.5 w-3.5 mr-1.5" /> Singolo
+            </TabsTrigger>
+            <TabsTrigger value="carousel">
+              <Layers className="h-3.5 w-3.5 mr-1.5" /> Carosello
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="single" className="space-y-4 pt-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Post LinkedIn da illustrare
+              </label>
+              <Textarea
+                placeholder="Incolla qui il post completo (o solo l'hook + concetto principale)..."
+                value={values.post_text || ""}
+                onChange={(e) => set("post_text", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary transition-colors"
+                rows={8}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Niente generazione di immagini reali. Ti diamo concept, palette e 3 prompt copia-incolla per generatori AI.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Formato visual</label>
+              <Select value={values.formato || "single"} onValueChange={(v) => set("formato", v)}>
+                <SelectTrigger className="bg-surface border-border/50">
+                  <SelectValue placeholder="Formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Singolo (1200×1200) — feed quadrato</SelectItem>
+                  <SelectItem value="landscape">Landscape (1200×627) — feed orizzontale</SelectItem>
+                  <SelectItem value="portrait">Portrait (1080×1350) — più visibile in feed</SelectItem>
+                  <SelectItem value="story">Story / Reel cover (1080×1920)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="carousel" className="space-y-4 pt-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Tema / argomento del carosello</label>
+              <Textarea
+                placeholder="Es. 'I 5 errori più comuni di chi sceglie il primo CRM' — sii specifico, è il filo conduttore dello storyboard."
+                value={values.tema || ""}
+                onChange={(e) => set("tema", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary transition-colors"
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">
+                Post sorgente <span className="text-muted-foreground/60">(opzionale, dà più contesto)</span>
+              </label>
+              <Textarea
+                placeholder="Se hai già un post sul tema, incollalo qui per allineare lo storyboard."
+                value={values.post_text || ""}
+                onChange={(e) => set("post_text", e.target.value)}
+                className="bg-surface border-border/50 focus:border-primary transition-colors"
+                rows={4}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Numero slide (incluse cover e CTA)</label>
+              <Select value={values.num_slide || "8"} onValueChange={(v) => set("num_slide", v)}>
+                <SelectTrigger className="bg-surface border-border/50">
+                  <SelectValue placeholder="N slide" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 slide — breve</SelectItem>
+                  <SelectItem value="7">7 slide — standard</SelectItem>
+                  <SelectItem value="8">8 slide — consigliato</SelectItem>
+                  <SelectItem value="10">10 slide — esteso</SelectItem>
+                  <SelectItem value="12">12 slide — long form</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </TabsContent>
+        </Tabs>
         {submitBtn}
       </div>
     );
@@ -2759,43 +2671,7 @@ function SkillForm({
       </div>
     );
   }
-  if (skillId === "visual-post-builder") {
-    return (
-      <div className="space-y-4">
-        <Textarea
-          placeholder="Incolla il testo del post..."
-          value={values.post || ""}
-          onChange={(e) => set("post", e.target.value)}
-          className="bg-surface border-border/50 focus:border-primary transition-colors"
-          rows={4}
-        />
-        <Select value={values.style || "Minimal"} onValueChange={(v) => set("style", v)}>
-          <SelectTrigger className="bg-surface border-border/50">
-            <SelectValue placeholder="Stile" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Minimal">Minimal</SelectItem>
-            <SelectItem value="Bold">Bold</SelectItem>
-            <SelectItem value="Data Viz">Data Viz</SelectItem>
-            <SelectItem value="Storytelling">Storytelling</SelectItem>
-          </SelectContent>
-        </Select>
-        {submitBtn}
-      </div>
-    );
-  }
-  if (skillId === "content-performance") {
-    return (
-      <Button
-        onClick={() => onSubmit(values)}
-        disabled={loading}
-        className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11 shadow-lg shadow-primary/20"
-      >
-        {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}{" "}
-        {loading ? "Analisi..." : "Analizza i miei post"}
-      </Button>
-    );
-  }
+  // v3.8.3: rimossi i form di visual-post-builder e content-performance (skill obsolete).
   if (skillId === "icp-builder") {
     // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
     const selectedZones = (values.zone || "Italy").split(",").map((z) => z.trim()).filter(Boolean);
@@ -2972,7 +2848,8 @@ export default function SkillPage() {
     if (sid === "post-writer") return "post";
     if (sid === "post-improver") return "improvement";
     if (sid === "hook-generator") return "hook";
-    // v3.8.2 (Tranche 2): brief visuali
+    // v3.8.2/v3.8.3: visual-brief = tab Singolo. carousel-brief è il dispatch target della tab Carosello
+    // (entrambi mostrati nella stessa skill page "visual-brief").
     if (sid === "visual-brief") return "visual_brief";
     if (sid === "carousel-brief") return "carousel_brief";
     if (sid === "profile-banner-brief") return "banner_brief";
@@ -3143,6 +3020,17 @@ export default function SkillPage() {
       profile.business_profile as unknown as Record<string, unknown> | null,
       user.id,
     );
+
+    // v3.8.3 (Tranche 2.1): visual-brief con tab "Carosello" dispatcha al webhook carousel-brief.
+    if (skill.id === "visual-brief" && (formValues.tab || "single") === "carousel") {
+      effectiveSkillId = "carousel-brief";
+      payload = buildPayload(
+        "carousel-brief",
+        formValuesWithBrand,
+        profile.business_profile as unknown as Record<string, unknown> | null,
+        user.id,
+      );
+    }
 
     if (skill.id === "prospect-finder") {
       const mode = (formValues.searchMode as string) || (formValues.url ? "url" : "icp");
@@ -3338,17 +3226,20 @@ export default function SkillPage() {
       }
 
       // v3.8.1 (Tranche 1.5): auto-save asset per skill content (post-writer, post-improver, hook-generator).
-      if (isContentSkill && currentAssetType && result.data && Object.keys(result.data).length > 0) {
+      // v3.8.3: l'asset type viene risolto da effectiveSkillId (per visual-brief la tab Carosello
+      // dispatcha a "carousel-brief" → asset type "carousel_brief").
+      const effectiveAssetType = skillToAssetType(effectiveSkillId) || currentAssetType;
+      if (isContentSkill && effectiveAssetType && result.data && Object.keys(result.data).length > 0) {
         const inputSnapshot = { ...payload };
         // Rimuovi user_id dal snapshot (è già implicito nel row)
         delete (inputSnapshot as any).user_id;
         const created = await contentAssetsHook.create({
-          type: currentAssetType,
+          type: effectiveAssetType,
           parent_id: fromAssetId || null,
           input: inputSnapshot,
           output: result.data as Record<string, unknown>,
           title: autoTitleForAsset(
-            currentAssetType,
+            effectiveAssetType,
             inputSnapshot,
             result.data as Record<string, unknown>,
           ),
