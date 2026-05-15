@@ -1,10 +1,12 @@
 // src/lib/ember-types.ts
-// v3.8.2 (Tranche 2 — Pezzo 4B): aggiunge skill di visual brief (testuali, niente generazione immagini)
-//   - visual-brief         → dato un post, 3 prompt AI-image (Midjourney/Flux/Ideogram) + concept + palette
-//   - carousel-brief       → storyboard slide-by-slide con copy slot + AI prompt per ogni slide
-//   - profile-banner-brief → banner LinkedIn 1584×396: concept + 3 prompt + palette
-// v3.8.0 (Tranche 1 — Pezzo 4A): aggiunge BrandKit + skill IDs nuove
-// (post-improver, hook-generator).
+// v3.8.3 (Tranche 2.1 — cleanup):
+//   - profile-banner-brief spostato nel layer "profilo" (è un asset di profilo, non di content)
+//   - visual-brief unifica anche carousel-brief (tab interni: Singolo | Carosello); carousel-brief
+//     resta come SkillId per il dispatch lato n8n ma NON ha più una card propria in SKILLS.
+//   - Rimosse skill obsolete: visual-post-builder (sostituita da visual-brief) e content-performance
+//     (non in uso, andava in errore).
+// v3.8.2 (Tranche 2 — Pezzo 4B): visual-brief, carousel-brief, profile-banner-brief.
+// v3.8.0 (Tranche 1 — Pezzo 4A): aggiunge BrandKit + skill IDs nuove (post-improver, hook-generator).
 
 export type SkillId =
   | "auto-profile-setup"
@@ -12,10 +14,8 @@ export type SkillId =
   | "post-improver"
   | "hook-generator"
   | "visual-brief"
-  | "carousel-brief"
+  | "carousel-brief" // tenuto come dispatch target dalla skill visual-brief (tab Carosello); non ha card propria.
   | "profile-banner-brief"
-  | "visual-post-builder"
-  | "content-performance"
   | "icp-builder"
   | "prospect-finder"
   | "outreach-drafter"
@@ -131,6 +131,17 @@ export const SKILLS: SkillConfig[] = [
     plans: ["trial", "base", "pro", "studio"],
   },
   {
+    // v3.8.3: spostato in layer "profilo" (è un asset di identità, non di content).
+    id: "profile-banner-brief",
+    name: "Brief banner profilo",
+    icon: "Flag",
+    description:
+      "Banner LinkedIn 1584×396: concept + palette + 3 prompt copia-incolla per generatori AI. Allineato al tuo brand kit.",
+    layer: "profilo",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
     id: "post-writer",
     name: "Scrivi un post",
     icon: "PenTool",
@@ -162,51 +173,13 @@ export const SKILLS: SkillConfig[] = [
   },
   {
     id: "visual-brief",
-    name: "Brief visual del post",
+    name: "Brief visual",
     icon: "ImagePlus",
     description:
-      "Dato un post, ottieni concept + palette + 3 prompt copia-incolla per generatori AI (Midjourney, Flux, Ideogram).",
+      "Visual del post o carosello multi-slide: concept, palette, copy slot e prompt copia-incolla per generatori AI. Tab interni: Singolo | Carosello.",
     layer: "content",
     usesScraping: false,
     plans: ["trial", "base", "pro", "studio"],
-  },
-  {
-    id: "carousel-brief",
-    name: "Brief carosello",
-    icon: "Layers",
-    description:
-      "Storyboard slide-by-slide: titolo, body, copy slot e prompt AI per ogni slide. Da consegnare al designer o usare in Canva/Figma.",
-    layer: "content",
-    usesScraping: false,
-    plans: ["trial", "base", "pro", "studio"],
-  },
-  {
-    id: "profile-banner-brief",
-    name: "Brief banner profilo",
-    icon: "Flag",
-    description:
-      "Banner LinkedIn 1584×396: concept + palette + 3 prompt copia-incolla per generatori AI. Allineato al tuo brand kit.",
-    layer: "content",
-    usesScraping: false,
-    plans: ["trial", "base", "pro", "studio"],
-  },
-  {
-    id: "visual-post-builder",
-    name: "Crea il visual",
-    icon: "Image",
-    description: "Specifiche per Canva e prompt AI per le immagini del post.",
-    layer: "content",
-    usesScraping: false,
-    plans: ["trial", "base", "pro", "studio"],
-  },
-  {
-    id: "content-performance",
-    name: "Analizza i contenuti",
-    icon: "BarChart3",
-    description: "Report settimanale: cosa funziona, cosa no, pattern e raccomandazioni.",
-    layer: "content",
-    usesScraping: true,
-    plans: ["pro", "studio"],
   },
   {
     id: "icp-builder",
@@ -259,7 +232,6 @@ export const SKILLS: SkillConfig[] = [
 export const SCRAPING_SKILLS: SkillId[] = [
   "auto-profile-setup",
   "prospect-finder",
-  "content-performance",
   "network-intelligence",
 ];
 

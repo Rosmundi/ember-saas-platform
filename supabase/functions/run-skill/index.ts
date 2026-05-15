@@ -37,6 +37,9 @@ const ALLOWED_SKILLS = new Set<string>([
   "post-improver",
   "hook-generator",
   // v3.8.2 (Tranche 2, Pezzo 4B) — visual brief skills (testuali, niente generazione immagini)
+  // v3.8.3: carousel-brief NON è più una skill UI; è il dispatch target della tab Carosello
+  // dentro la skill "visual-brief". Resta whitelisted perché run-skill viene chiamata con
+  // skillId="carousel-brief" quando l'utente sceglie quella tab.
   "visual-brief",
   "carousel-brief",
   "profile-banner-brief",

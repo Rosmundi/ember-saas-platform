@@ -357,8 +357,9 @@ export function contentTypeColor(type: ContentAssetType): string {
  * Mappatura type → skillId della skill page che lo gestisce.
  * Usata per costruire link `?assetId=<id>` o `?fromAssetId=<id>`.
  *
- * v3.8.2 (Tranche 2): i 3 brief hanno la loro skill dedicata; non puntano più
- * tutti a `visual-post-builder` come in v3.8.1.
+ * v3.8.3 (Tranche 2.1): visual_brief e carousel_brief puntano alla STESSA skill page
+ * (`visual-brief`) che internamente ha tab Singolo|Carosello. La detection del tab
+ * iniziale avviene in SkillPage.tsx (init values + fromAssetId useEffect).
  */
 export function contentTypeToSkillId(type: ContentAssetType): string {
   switch (type) {
@@ -371,7 +372,7 @@ export function contentTypeToSkillId(type: ContentAssetType): string {
     case "visual_brief":
       return "visual-brief";
     case "carousel_brief":
-      return "carousel-brief";
+      return "visual-brief"; // stessa skill page, tab Carosello (detect via asset.type in SkillForm)
     case "banner_brief":
       return "profile-banner-brief";
     default:
