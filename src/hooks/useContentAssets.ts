@@ -106,6 +106,12 @@ export function autoTitleForAsset(
       if (bizNome) return `Banner profilo di ${truncateForTitle(String(bizNome), 30)}`;
       return "Banner profilo senza titolo";
     }
+    case "profile_audit": {
+      const score = (out as any).score_complessivo;
+      return score != null
+        ? `Audit profilo — score ${score}/100`
+        : "Audit profilo LinkedIn";
+    }
     default:
       return "Asset senza titolo";
   }
