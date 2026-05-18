@@ -84,6 +84,20 @@ export function AppSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu>
+                {layer.label === "PROFILO" && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/profilo"
+                        className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
+                        activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
+                      >
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        {!collapsed && <span>Il mio profilo</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {layer.label === "CONTENT" && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
