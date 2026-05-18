@@ -2859,6 +2859,7 @@ export default function SkillPage() {
     if (sid === "visual-brief") return "visual_brief";
     if (sid === "carousel-brief") return "carousel_brief";
     if (sid === "profile-banner-brief") return "banner_brief";
+    if (sid === "profile-optimizer") return "profile_audit";
     return null;
   };
   const currentAssetType = skillToAssetType(skill?.id);
