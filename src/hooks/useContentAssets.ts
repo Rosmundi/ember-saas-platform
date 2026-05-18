@@ -25,7 +25,8 @@ export type ContentAssetType =
   | "hook"
   | "visual_brief"
   | "carousel_brief"
-  | "banner_brief";
+  | "banner_brief"
+  | "profile_audit";
 
 export interface ContentAssetRow {
   id: string;
