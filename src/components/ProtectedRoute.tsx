@@ -45,8 +45,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!onboardingDone && location.pathname !== "/onboarding") {
-    return <Navigate to="/onboarding" replace />;
+  if (!onboardingDone && location.pathname !== "/profilo") {
+    return <Navigate to="/profilo" replace />;
   }
 
   return <>{children}</>;

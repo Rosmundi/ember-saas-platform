@@ -1,6 +1,6 @@
-// src/App.tsx — v3.8.0 (Tranche 1): aggiunta route /brand
+// src/App.tsx — v3.8.5: unified /profilo, redirects per onboarding/brand/skill profilo
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,7 +8,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
-import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import SkillPage from "./pages/SkillPage";
 import History from "./pages/History";
@@ -16,7 +15,7 @@ import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
 import Icps from "./pages/Icps";
 import Searches from "./pages/Searches";
-import Brand from "./pages/Brand";
+import Profilo from "./pages/Profilo";
 import Content from "./pages/Content";
 import NotFound from "./pages/NotFound";
 
@@ -32,9 +31,10 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/onboarding" element={
+            <Route path="/onboarding" element={<Navigate to="/profilo" replace />} />
+            <Route path="/profilo" element={
               <ProtectedRoute>
-                <Onboarding />
+                <Profilo />
               </ProtectedRoute>
             } />
             <Route path="/dashboard" element={
@@ -72,11 +72,7 @@ const App = () => (
                 <Searches />
               </ProtectedRoute>
             } />
-            <Route path="/brand" element={
-              <ProtectedRoute>
-                <Brand />
-              </ProtectedRoute>
-            } />
+            <Route path="/brand" element={<Navigate to="/profilo#brand-voice" replace />} />
             <Route path="/content" element={
               <ProtectedRoute>
                 <Content />

@@ -3000,6 +3000,23 @@ export default function SkillPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+
+  // v3.8.5: redirect legacy skill profilo → /profilo unificato.
+  useEffect(() => {
+    if (!skillId) return;
+    if (skillId === "regenerate-section") {
+      const section = searchParams.get("section") || "headline";
+      navigate(`/profilo?regenerate=${section.toLowerCase()}`, { replace: true });
+      return;
+    }
+    const map: Record<string, string> = {
+      "auto-profile-setup": "/profilo?action=rescan",
+      "profile-optimizer": "/profilo?action=reaudit",
+      "profile-banner-brief": "/profilo#banner",
+    };
+    if (map[skillId]) navigate(map[skillId], { replace: true });
+  }, [skillId, navigate, searchParams]);
+
   const skill = SKILLS.find((s) => s.id === skillId);
   const { profile, consumeSkillRun, updateRawProfileData, updateProfile } = useProfile();
   const { logRun } = useSkillRuns();

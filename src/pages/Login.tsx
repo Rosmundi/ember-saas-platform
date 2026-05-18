@@ -29,7 +29,7 @@ export default function Login() {
       if (authError) {
         setError(authError.message);
       } else {
-        navigate("/onboarding");
+        navigate("/profilo");
       }
     } else {
       const { error: authError } = await supabase.auth.signInWithPassword({

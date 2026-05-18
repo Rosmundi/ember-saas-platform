@@ -121,38 +121,9 @@ export interface SkillConfig {
 }
 
 export const SKILLS: SkillConfig[] = [
-  {
-    id: "auto-profile-setup",
-    name: "Analizza profilo",
-    icon: "UserCheck",
-    description:
-      "Analisi completa del tuo profilo LinkedIn con score 0-100, audit per sezione e riscritture pronte da copiare.",
-    layer: "profilo",
-    usesScraping: true,
-    plans: ["trial", "base", "pro", "studio"],
-  },
-  {
-    // v3.8.4: audit completo profilo (hub navigazionale del layer Profilo).
-    id: "profile-optimizer",
-    name: "Ottimizza il profilo",
-    icon: "BarChart3",
-    description:
-      "Audit completo del tuo profilo LinkedIn con score 0-100, breakdown per sezione e azioni operative pronte da fare.",
-    layer: "profilo",
-    usesScraping: false,
-    plans: ["trial", "base", "pro", "studio"],
-  },
-  {
-    // v3.8.3: spostato in layer "profilo" (è un asset di identità, non di content).
-    id: "profile-banner-brief",
-    name: "Brief banner profilo",
-    icon: "Flag",
-    description:
-      "Banner LinkedIn 1584×396: concept + palette + 3 prompt copia-incolla per generatori AI. Allineato al tuo brand kit.",
-    layer: "profilo",
-    usesScraping: false,
-    plans: ["trial", "base", "pro", "studio"],
-  },
+  // v3.8.5: tutte le skill del layer "profilo" sono assorbite dalla pagina /profilo
+  // (auto-profile-setup, profile-optimizer, profile-banner-brief, regenerate-section).
+  // Restano whitelisted lato edge function, ma NON hanno più card UI in sidebar/dashboard.
   {
     id: "post-writer",
     name: "Scrivi un post",
