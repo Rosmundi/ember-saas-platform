@@ -127,7 +127,7 @@ function OnboardingEmptyState() {
       user_id: user.id, linkedin_url: linkedinUrl,
     });
     setLoading(false);
-    if (!result.ok) { toast.error(emberErrorMessage(result.error)); return; }
+    if (!result.ok) { const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err)); return; }
     const d = result.data as Record<string, unknown>;
     const pb = (d.profilo_business as Record<string, string>) || {};
     const hooks = (d.hook_editoriali || []) as string[];
@@ -824,8 +824,8 @@ function UpdateAuditDialog({
     });
     if (!result.ok) {
       setLoading(false);
-      toast.error(emberErrorMessage(result.error));
-      await logRun({ skill: "profile-optimizer", input: { obiettivo }, output: null, status: "error", is_scrape: false, error_message: result.error.message });
+      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
+      await logRun({ skill: "profile-optimizer", input: { obiettivo }, output: null, status: "error", is_scrape: false, error_message: err.message });
       return;
     }
     const d = result.data as any;
@@ -890,8 +890,8 @@ function RescanDialog({
     });
     if (!result.ok) {
       setLoading(false);
-      toast.error(emberErrorMessage(result.error));
-      await logRun({ skill: "auto-profile-setup", input: { linkedin_url: profile.linkedin_url }, output: null, status: "error", is_scrape: true, error_message: result.error.message });
+      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
+      await logRun({ skill: "auto-profile-setup", input: { linkedin_url: profile.linkedin_url }, output: null, status: "error", is_scrape: true, error_message: err.message });
       return;
     }
     const d = result.data as any;
@@ -947,8 +947,8 @@ function BannerBriefDialog({ open, onClose, profile, userId, consumeSkillRun, lo
     });
     if (!result.ok) {
       setLoading(false);
-      toast.error(emberErrorMessage(result.error));
-      await logRun({ skill: "profile-banner-brief", input: {}, output: null, status: "error", is_scrape: false, error_message: result.error.message });
+      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
+      await logRun({ skill: "profile-banner-brief", input: {}, output: null, status: "error", is_scrape: false, error_message: err.message });
       return;
     }
     setOutput(result.data);
@@ -1040,8 +1040,8 @@ function RewriteSectionDialog({
     });
     if (!result.ok) {
       setLoading(false);
-      toast.error(emberErrorMessage(result.error));
-      await logRun({ skill: "regenerate-section", input: { section: section.nome }, output: null, status: "error", is_scrape: false, error_message: result.error.message });
+      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
+      await logRun({ skill: "regenerate-section", input: { section: section.nome }, output: null, status: "error", is_scrape: false, error_message: err.message });
       return;
     }
     setNewText(result.data.new_rewrite);
