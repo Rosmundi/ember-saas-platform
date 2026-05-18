@@ -144,7 +144,13 @@ function buildPayload(
     case "auto-profile-setup":
       return { user_id: userId, linkedin_url: values.url };
     case "profile-optimizer":
-      return { profilo_business: bp, obiettivo: values.obiettivo || "attrarre clienti B2B" };
+      // v3.8.4: audit completo del profilo LinkedIn.
+      return {
+        profilo_business: bp,
+        raw_profile_data: (values.raw_profile_data_json && JSON.parse(values.raw_profile_data_json)) || {},
+        obiettivo: values.obiettivo || "",
+        brand_kit: (values.brand_kit_json && JSON.parse(values.brand_kit_json)) || { tone: "corporate" },
+      };
     case "post-writer":
       // v3.8.0: brand_kit + tone override + ICP target opzionale
       return {
