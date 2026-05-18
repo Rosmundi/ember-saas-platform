@@ -1443,6 +1443,132 @@ function SkillOutput({
     );
   }
 
+  // v3.8.4: profile-optimizer renderer (audit profilo).
+  if (skillId === "profile-optimizer") {
+    const scoreHex = (s: number): string => {
+      if (s >= 80) return "#10b981";
+      if (s >= 60) return "#f59e0b";
+      if (s >= 40) return "#f97316";
+      return "#ef4444";
+    };
+    const total = Number(data.score_complessivo ?? 0);
+    return (
+      <div className="space-y-6 animate-in">
+        {/* Score complessivo + breakdown */}
+        <Card className="bg-card border-border/50">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-baseline justify-between gap-4 flex-wrap">
+              <h3 className="text-lg font-semibold">Score profilo LinkedIn</h3>
+              <div className="text-4xl font-bold" style={{ color: scoreHex(total) }}>
+                {total}
+                <span className="text-base text-muted-foreground">/100</span>
+              </div>
+            </div>
+            {data.score_breakdown && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {Object.entries(data.score_breakdown as Record<string, unknown>).map(([k, v]) => (
+                  <div key={k} className="text-xs">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-muted-foreground capitalize">{k.replace(/_/g, " ")}</span>
+                      <span className="font-semibold">{String(v)}</span>
+                    </div>
+                    <Progress value={Number(v)} className="h-1.5" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top 3 priorità */}
+        {Array.isArray(data.priorita_top_3) && data.priorita_top_3.length > 0 && (
+          <Card className="bg-card border-primary/30">
+            <CardContent className="p-6 space-y-3">
+              <h3 className="text-base font-semibold flex items-center gap-2">
+                <Target className="h-4 w-4 text-primary" /> Le 3 cose da fare subito
+              </h3>
+              <ol className="space-y-2">
+                {(data.priorita_top_3 as string[]).map((p, i) => (
+                  <li key={i} className="text-sm flex gap-3">
+                    <span className="font-bold text-primary">{i + 1}.</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Audit dettagliato per sezione */}
+        {Array.isArray(data.audit) && data.audit.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold">Audit per sezione</h3>
+            {(data.audit as any[]).map((a, i) => (
+              <Card key={i} className="bg-card border-border/50">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="font-semibold capitalize">{a.sezione?.replace(/_/g, " ")}</h4>
+                    <Badge
+                      variant="secondary"
+                      style={{ backgroundColor: `${scoreHex(Number(a.score ?? 0))}20`, color: scoreHex(Number(a.score ?? 0)) }}
+                    >
+                      {a.score}/100
+                    </Badge>
+                  </div>
+                  {a.problema && (
+                    <p className="text-sm text-muted-foreground">
+                      <strong className="text-foreground">Problema:</strong> {a.problema}
+                    </p>
+                  )}
+                  {a.soluzione && (
+                    <p className="text-sm">
+                      <strong>Soluzione:</strong> {a.soluzione}
+                    </p>
+                  )}
+                  {a.esempio_riscritto && (
+                    <div className="bg-muted/30 rounded-md p-3 text-sm relative">
+                      <pre className="whitespace-pre-wrap font-sans pr-8">{a.esempio_riscritto}</pre>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="absolute top-2 right-2 h-7 w-7 p-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(a.esempio_riscritto);
+                          toast.success("Copiato!");
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Next actions con deeplink */}
+        {Array.isArray(data.next_actions) && data.next_actions.length > 0 && (
+          <Card className="bg-card border-border/50">
+            <CardContent className="p-6 space-y-3">
+              <h3 className="text-base font-semibold">Continua da qui</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(data.next_actions as any[]).map((na, i) => (
+                  <Button key={i} variant="outline" asChild className="justify-start h-auto py-3">
+                    <Link to={na.deeplink || "#"}>
+                      <ArrowRight className="h-4 w-4 mr-2 shrink-0" />
+                      <span className="text-left">{na.azione}</span>
+                    </Link>
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   // v3.8.3: rimossi i renderer di visual-post-builder e content-performance (skill obsolete).
 
   if (skillId === "icp-builder") {
