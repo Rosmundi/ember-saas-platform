@@ -10,6 +10,7 @@
 
 export type SkillId =
   | "auto-profile-setup"
+  | "profile-optimizer"
   | "post-writer"
   | "post-improver"
   | "hook-generator"
