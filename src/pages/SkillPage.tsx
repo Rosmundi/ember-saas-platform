@@ -52,6 +52,7 @@ import {
   ImagePlus,
   Layers,
   Flag,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
