@@ -132,6 +132,17 @@ export const SKILLS: SkillConfig[] = [
     plans: ["trial", "base", "pro", "studio"],
   },
   {
+    // v3.8.4: audit completo profilo (hub navigazionale del layer Profilo).
+    id: "profile-optimizer",
+    name: "Ottimizza il profilo",
+    icon: "BarChart3",
+    description:
+      "Audit completo del tuo profilo LinkedIn con score 0-100, breakdown per sezione e azioni operative pronte da fare.",
+    layer: "profilo",
+    usesScraping: false,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
     // v3.8.3: spostato in layer "profilo" (è un asset di identità, non di content).
     id: "profile-banner-brief",
     name: "Brief banner profilo",
