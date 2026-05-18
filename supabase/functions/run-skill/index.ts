@@ -28,6 +28,8 @@ const CORS_HEADERS = {
 const ALLOWED_SKILLS = new Set<string>([
   "auto-profile-setup",
   "regenerate-section",
+  // v3.8.4: profile-optimizer (audit profilo end-to-end, layer Profilo).
+  "profile-optimizer",
   "prospect-finder",
   "icp-builder",
   "outreach-drafter",
