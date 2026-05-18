@@ -3011,9 +3011,11 @@ export default function SkillPage() {
     // v3.8.0 (Tranche 1): inietta brand_kit nel formValues per le skill content-writing.
     // buildPayload legge values.brand_kit_json (string JSON) e lo deserializza.
     const brandKit = ((profile as any)?.brand_kit as Record<string, unknown> | undefined) ?? null;
+    const rawProfileData = ((profile as any)?.raw_profile_data as Record<string, unknown> | undefined) ?? null;
     const formValuesWithBrand: Record<string, string> = {
       ...formValues,
       brand_kit_json: brandKit ? JSON.stringify(brandKit) : "",
+      raw_profile_data_json: rawProfileData ? JSON.stringify(rawProfileData) : "",
       // ICP target opzionale (per post-writer): default = ICP default dell'utente, se presente.
       icp_target_json:
         formValues.icp_target_json ||
