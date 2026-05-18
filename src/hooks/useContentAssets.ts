@@ -357,6 +357,8 @@ export function contentTypeColor(type: ContentAssetType): string {
       return "bg-blue-500/15 text-blue-400 border-blue-500/30";
     case "banner_brief":
       return "bg-pink-500/15 text-pink-400 border-pink-500/30";
+    case "profile_audit":
+      return "bg-indigo-500/15 text-indigo-400 border-indigo-500/30";
     default:
       return "bg-muted text-muted-foreground border-border/30";
   }
