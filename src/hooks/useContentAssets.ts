@@ -386,6 +386,8 @@ export function contentTypeToSkillId(type: ContentAssetType): string {
       return "visual-brief"; // stessa skill page, tab Carosello (detect via asset.type in SkillForm)
     case "banner_brief":
       return "profile-banner-brief";
+    case "profile_audit":
+      return "profile-optimizer";
     default:
       return "post-writer";
   }
