@@ -72,11 +72,7 @@ const App = () => (
                 <Searches />
               </ProtectedRoute>
             } />
-            <Route path="/brand" element={
-              <ProtectedRoute>
-                <Brand />
-              </ProtectedRoute>
-            } />
+            <Route path="/brand" element={<Navigate to="/profilo#brand-voice" replace />} />
             <Route path="/content" element={
               <ProtectedRoute>
                 <Content />
