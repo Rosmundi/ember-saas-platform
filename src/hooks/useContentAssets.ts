@@ -336,6 +336,8 @@ export function contentTypeLabel(type: ContentAssetType): string {
       return "Carousel brief";
     case "banner_brief":
       return "Banner brief";
+    case "profile_audit":
+      return "Audit profilo";
     default:
       return type;
   }
