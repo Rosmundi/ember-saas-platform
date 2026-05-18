@@ -2680,6 +2680,40 @@ function SkillForm({
       </div>
     );
   }
+  // v3.8.4: profile-optimizer form (audit profilo end-to-end).
+  if (skillId === "profile-optimizer") {
+    const hasRawProfile = !!(profile?.raw_profile_data as any);
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            Obiettivo <span className="text-muted-foreground/60">(opzionale)</span>
+          </label>
+          <Input
+            placeholder="Es: Attrarre PMI manifatturiere come early customer"
+            value={values.obiettivo || ""}
+            onChange={(e) => set("obiettivo", e.target.value)}
+            className="bg-surface border-border/50 focus:border-primary h-11"
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Se lasci vuoto, Ember usa la tua value proposition come obiettivo implicito.
+          </p>
+        </div>
+        {!hasRawProfile && (
+          <Alert>
+            <AlertDescription>
+              <strong>Nota:</strong> per un audit più dettagliato, runna prima{" "}
+              <Link to="/skill/auto-profile-setup" className="underline text-primary">
+                Analizza profilo
+              </Link>{" "}
+              per scaricare i tuoi dati LinkedIn completi.
+            </AlertDescription>
+          </Alert>
+        )}
+        {submitBtn}
+      </div>
+    );
+  }
   // v3.8.3: rimossi i form di visual-post-builder e content-performance (skill obsolete).
   if (skillId === "icp-builder") {
     // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
