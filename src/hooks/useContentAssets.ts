@@ -25,7 +25,8 @@ export type ContentAssetType =
   | "hook"
   | "visual_brief"
   | "carousel_brief"
-  | "banner_brief";
+  | "banner_brief"
+  | "profile_audit";
 
 export interface ContentAssetRow {
   id: string;
@@ -104,6 +105,12 @@ export function autoTitleForAsset(
       const bizNome = inp.profilo_business?.nome;
       if (bizNome) return `Banner profilo di ${truncateForTitle(String(bizNome), 30)}`;
       return "Banner profilo senza titolo";
+    }
+    case "profile_audit": {
+      const score = (out as any).score_complessivo;
+      return score != null
+        ? `Audit profilo — score ${score}/100`
+        : "Audit profilo LinkedIn";
     }
     default:
       return "Asset senza titolo";
@@ -329,6 +336,8 @@ export function contentTypeLabel(type: ContentAssetType): string {
       return "Carousel brief";
     case "banner_brief":
       return "Banner brief";
+    case "profile_audit":
+      return "Audit profilo";
     default:
       return type;
   }
@@ -348,6 +357,8 @@ export function contentTypeColor(type: ContentAssetType): string {
       return "bg-blue-500/15 text-blue-400 border-blue-500/30";
     case "banner_brief":
       return "bg-pink-500/15 text-pink-400 border-pink-500/30";
+    case "profile_audit":
+      return "bg-indigo-500/15 text-indigo-400 border-indigo-500/30";
     default:
       return "bg-muted text-muted-foreground border-border/30";
   }
@@ -375,6 +386,8 @@ export function contentTypeToSkillId(type: ContentAssetType): string {
       return "visual-brief"; // stessa skill page, tab Carosello (detect via asset.type in SkillForm)
     case "banner_brief":
       return "profile-banner-brief";
+    case "profile_audit":
+      return "profile-optimizer";
     default:
       return "post-writer";
   }

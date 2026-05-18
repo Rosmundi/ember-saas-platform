@@ -10,6 +10,7 @@
 
 export type SkillId =
   | "auto-profile-setup"
+  | "profile-optimizer"
   | "post-writer"
   | "post-improver"
   | "hook-generator"
@@ -128,6 +129,17 @@ export const SKILLS: SkillConfig[] = [
       "Analisi completa del tuo profilo LinkedIn con score 0-100, audit per sezione e riscritture pronte da copiare.",
     layer: "profilo",
     usesScraping: true,
+    plans: ["trial", "base", "pro", "studio"],
+  },
+  {
+    // v3.8.4: audit completo profilo (hub navigazionale del layer Profilo).
+    id: "profile-optimizer",
+    name: "Ottimizza il profilo",
+    icon: "BarChart3",
+    description:
+      "Audit completo del tuo profilo LinkedIn con score 0-100, breakdown per sezione e azioni operative pronte da fare.",
+    layer: "profilo",
+    usesScraping: false,
     plans: ["trial", "base", "pro", "studio"],
   },
   {
