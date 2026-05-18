@@ -31,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SkillIcon } from "@/components/SkillIcon";
 import { ScoreBadge } from "@/components/ScoreBadge";
 // v3.6.1: card prospect "rich" per il risultato di prospect-search-harvest.
