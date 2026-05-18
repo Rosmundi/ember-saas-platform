@@ -81,7 +81,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!profileLoading && profile && !onboardingCompleted) {
-      navigate("/onboarding", { replace: true });
+      navigate("/profilo", { replace: true });
     }
   }, [profileLoading, profile, onboardingCompleted, navigate]);
 
