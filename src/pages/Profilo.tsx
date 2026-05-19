@@ -1131,17 +1131,19 @@ function BannerBriefDialog({ open, onClose, profile, userId, consumeSkillRun, lo
 }
 
 function RewriteSectionDialog({
-  sectionName, onClose, sezioni, profile, userId, raw, updateRawProfileData, consumeSkillRun, logRun,
+  sectionName, initialFeedback = "", onClose, sezioni, profile, userId, raw, updateRawProfileData, consumeSkillRun, logRun,
 }: any) {
   const open = sectionName !== null;
   const section = sezioni.find((s: any) => s.nome === sectionName);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState(initialFeedback);
   const [loading, setLoading] = useState(false);
   const [newText, setNewText] = useState<string | null>(null);
 
+  // v3.8.6: ogni volta che il dialog si apre o cambia il chip, pre-compila il feedback.
   useEffect(() => {
-    if (!open) { setFeedback(""); setNewText(null); }
-  }, [open]);
+    if (open) { setFeedback(initialFeedback || ""); setNewText(null); }
+    else { setFeedback(""); setNewText(null); }
+  }, [open, initialFeedback]);
 
   const generate = async () => {
     if (!section || !userId) return;
