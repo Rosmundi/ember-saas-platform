@@ -1,95 +1,57 @@
-// src/pages/Profilo.tsx — v3.8.5 Unified Profile Page
-// Assorbe: /onboarding, /brand, /skill/auto-profile-setup, /skill/profile-optimizer,
-// /skill/profile-banner-brief, /skill/regenerate-section.
-// Tutti i dialog sono inline qui per ridurre fragmentazione.
-
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+// src/pages/Profilo.tsx — v3.8.7 Consolidate (Opzione B)
+// 2 sezioni vere (Stato + Audit). Tutto il resto è chrome: header, brand widget,
+// footer azioni, modal raw LinkedIn.
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useProfile } from "@/hooks/useProfile";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSkillRuns } from "@/hooks/useSkillRuns";
-import { callSkill, callRegenerateSection, emberErrorMessage } from "@/lib/ember-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  UserCheck, Loader2, RotateCcw, RefreshCw, Save, Wand2, Flag, Palette,
-  ChevronRight, ChevronDown, AlertTriangle, X, Plus, Copy, CheckCircle,
-  ImageIcon, BarChart3, Sparkles,
-} from "lucide-react";
-import { toast } from "sonner";
-import type { BusinessProfile, BrandKit } from "@/lib/ember-types";
+  Popover, PopoverTrigger, PopoverContent,
+} from "@/components/ui/popover";
+import { Sparkles, Palette, ImagePlus, FileText, Loader2 } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
+import { OnboardingEmptyState } from "@/components/profile/OnboardingEmptyState";
+import { StatoSection } from "@/components/profile/StatoSection";
+import { AuditSection } from "@/components/profile/AuditSection";
+import { ProfileHeaderCard } from "@/components/profile/ProfileHeaderCard";
+import { BrandVoiceWidget } from "@/components/profile/BrandVoiceWidget";
+import { UpdateAuditDialog } from "@/components/profile/dialogs/UpdateAuditDialog";
+import { BannerBriefDialog } from "@/components/profile/dialogs/BannerBriefDialog";
+import { RawLinkedInDialog } from "@/components/profile/dialogs/RawLinkedInDialog";
 
-// ============================================================================
-// Helpers
-// ============================================================================
-function scoreColor(score: number): string {
-  if (score >= 80) return "text-emerald-400 border-emerald-400/30 bg-emerald-400/10";
-  if (score >= 60) return "text-amber-400 border-amber-400/30 bg-amber-400/10";
-  if (score >= 40) return "text-orange-400 border-orange-400/30 bg-orange-400/10";
-  return "text-destructive border-destructive/30 bg-destructive/10";
-}
-function scoreLevel(score: number): string {
-  if (score >= 85) return "Avanzato";
-  if (score >= 70) return "Intermedio";
-  if (score >= 50) return "Base";
-  return "Da migliorare";
-}
-function isValidHex(v: string): boolean {
-  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v.trim());
-}
-function CopyBtn({ text, label = "Copia" }: { text: string; label?: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <Button
-      variant="ghost" size="sm" className="h-7 px-2 text-xs"
-      onClick={(e) => {
-        e.preventDefault(); e.stopPropagation();
-        navigator.clipboard.writeText(text);
-        setDone(true); toast.success("Copiato!");
-        setTimeout(() => setDone(false), 1500);
-      }}
-    >
-      {done ? <CheckCircle className="h-3 w-3 mr-1 text-emerald-400" /> : <Copy className="h-3 w-3 mr-1" />}
-      {done ? "Copiato" : label}
-    </Button>
-  );
-}
-
-// ============================================================================
-// MAIN
-// ============================================================================
 export default function Profilo() {
   const { profile, loading, onboardingCompleted } = useProfile();
+  const [auditDialogOpen, setAuditDialogOpen] = useState(false);
+  const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
+  const [rawDialogOpen, setRawDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Compat redirect legacy: ?action=reaudit / ?action=rescan
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "reaudit" || action === "rescan") {
+      setAuditDialogOpen(true);
+    }
+    if (action) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("action");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-32">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </AppLayout>
     );
   }
 
-  if (!profile || !onboardingCompleted) {
+  if (!profile || !onboardingCompleted || !profile.business_profile) {
     return (
       <AppLayout>
         <OnboardingEmptyState />
@@ -97,1145 +59,97 @@ export default function Profilo() {
     );
   }
 
+  // v3.8.7: audit data ora vive in raw_profile_data.audit (snapshot ultimo audit).
+  // Fallback su shape legacy (raw_profile_data root) per audit pre-v3.8.7.
+  const raw = (profile.raw_profile_data || {}) as Record<string, any>;
+  const audit = raw.audit ?? {
+    score_complessivo: raw.score_totale || raw.score_complessivo,
+    score_breakdown: raw.score_breakdown,
+    sezioni: raw.sezioni,
+    priorita_top_3: raw.priorita_top_3 || raw.azioni_prioritarie,
+    sintesi: raw.sintesi,
+    next_actions: raw.next_actions,
+  };
+  const hasAudit = audit && (audit.score_complessivo || audit.score_totale || (audit.sezioni && audit.sezioni.length));
+
   return (
     <AppLayout>
-      <UnifiedProfileContent />
-    </AppLayout>
-  );
-}
-
-// ============================================================================
-// Empty state (ex /onboarding)
-// ============================================================================
-function OnboardingEmptyState() {
-  const { user } = useAuth();
-  const { saveOnboardingProfile } = useProfile();
-  const [step, setStep] = useState<1 | 2>(1);
-  const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [rawData, setRawData] = useState<Record<string, unknown> | null>(null);
-  const [bp, setBp] = useState<BusinessProfile>({
-    nome: "", headline: "", settore: "", value_proposition: "",
-    tone_of_voice: "Diretto e pratico", punti_forza: [], aree_miglioramento: [], tags: [],
-  });
-  const isValidUrl = linkedinUrl.startsWith("https://www.linkedin.com/in/");
-
-  const handleAnalyze = async () => {
-    if (!isValidUrl || !user) return;
-    setLoading(true);
-    const result = await callSkill("auto-profile-setup", {
-      user_id: user.id, linkedin_url: linkedinUrl,
-    });
-    setLoading(false);
-    if (!result.ok) { const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err)); return; }
-    const d = result.data as Record<string, unknown>;
-    const pb = (d.profilo_business as Record<string, string>) || {};
-    const hooks = (d.hook_editoriali || []) as string[];
-    setBp({
-      nome: pb.nome || pb.chi_e || "",
-      headline: pb.chi_e || "",
-      settore: pb.settore || "",
-      value_proposition: [pb.offerta, pb.unique_value].filter(Boolean).join(". "),
-      tone_of_voice: "Diretto e pratico",
-      punti_forza: hooks.length > 0 ? hooks : ["Da definire"],
-      aree_miglioramento: [],
-      tags: (pb.settore || "").split(/[,\/\s]+/).filter((t: string) => t.length > 2),
-    });
-    setRawData(d);
-    setStep(2);
-    toast.success("Profilo analizzato!");
-  };
-
-  const handleConfirm = async () => {
-    setLoading(true);
-    await saveOnboardingProfile(linkedinUrl, bp, rawData || {});
-    setLoading(false);
-    toast.success("Profilo salvato! Carico l'audit…");
-    // La pagina si ricaricherà sola perché useProfile rifetcha e onboardingCompleted diventa true.
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-6 py-8">
-      <div className="text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-          <UserCheck className="h-7 w-7 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold">Il mio profilo</h1>
-        <p className="text-muted-foreground text-sm">
-          Iniziamo dal tuo profilo LinkedIn. Lo analizziamo e creiamo audit + brand kit.
-        </p>
-      </div>
-      <div className="flex items-center justify-center gap-2">
-        {[1, 2].map((s) => (
-          <div key={s} className={`h-1.5 w-20 rounded-full ${s <= step ? "bg-primary" : "bg-border"}`} />
-        ))}
-      </div>
-
-      {step === 1 && (
-        <Card className="bg-card border-border/50">
-          <CardContent className="p-6 space-y-4">
-            <Input
-              placeholder="https://www.linkedin.com/in/tuoprofilo"
-              value={linkedinUrl}
-              onChange={(e) => setLinkedinUrl(e.target.value)}
-              className="bg-surface border-border/50 h-11"
-            />
-            {linkedinUrl && !isValidUrl && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>L'URL deve iniziare con https://www.linkedin.com/in/</AlertDescription>
-              </Alert>
-            )}
-            <Button
-              onClick={handleAnalyze} disabled={loading || !isValidUrl}
-              className="w-full bg-primary hover:bg-primary-hover text-primary-foreground h-11"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-              {loading ? "Analisi in corso (30-60s)…" : "Analizza profilo"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 2 && (
-        <Card className="bg-card border-border/50">
-          <CardContent className="p-6 space-y-4">
-            <p className="text-sm text-muted-foreground">Controlla e conferma il tuo business profile.</p>
-            <Field label="Nome / Chi sei">
-              <Input value={bp.nome} onChange={(e) => setBp({ ...bp, nome: e.target.value })} className="bg-surface border-border/50" />
-            </Field>
-            <Field label="Headline">
-              <Input value={bp.headline} onChange={(e) => setBp({ ...bp, headline: e.target.value })} className="bg-surface border-border/50" />
-            </Field>
-            <Field label="Settore">
-              <Input value={bp.settore} onChange={(e) => setBp({ ...bp, settore: e.target.value })} className="bg-surface border-border/50" />
-            </Field>
-            <Field label="Value proposition">
-              <Textarea rows={3} value={bp.value_proposition} onChange={(e) => setBp({ ...bp, value_proposition: e.target.value })} className="bg-surface border-border/50" />
-            </Field>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setStep(1)} className="flex-1">Indietro</Button>
-              <Button onClick={handleConfirm} disabled={loading} className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground">
-                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                Conferma
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-// ============================================================================
-// Unified profile content (existing user)
-// ============================================================================
-function UnifiedProfileContent() {
-  const { user } = useAuth();
-  const { profile, updateProfile, updateRawProfileData, fetchProfile, consumeSkillRun } = useProfile();
-  const { logRun } = useSkillRuns();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Dialog state
-  const [auditDialog, setAuditDialog] = useState(false);
-  const [rescanDialog, setRescanDialog] = useState(false);
-  const [bannerDialog, setBannerDialog] = useState(false);
-  const [rewriteDialog, setRewriteDialog] = useState<{ name: string; initialFeedback?: string } | null>(null);
-
-  // Auto-open via query params (redirect compat)
-  const action = searchParams.get("action");
-  const regenerateSection = searchParams.get("regenerate");
-  useEffect(() => {
-    if (action === "rescan") setRescanDialog(true);
-    if (action === "reaudit") setAuditDialog(true);
-    if (regenerateSection) {
-      const cap = regenerateSection.charAt(0).toUpperCase() + regenerateSection.slice(1);
-      setRewriteDialog({ name: cap });
-    }
-    if (action || regenerateSection) {
-      // Pulisci query per evitare ri-apertura su navigate-back
-      const next = new URLSearchParams(searchParams);
-      next.delete("action"); next.delete("regenerate");
-      setSearchParams(next, { replace: true });
-    }
-    // Anchor scroll
-    if (window.location.hash) {
-      const id = window.location.hash.slice(1);
-      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }), 100);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (!profile) return null;
-
-  const raw = (profile.raw_profile_data || {}) as Record<string, any>;
-  const score = raw.score_totale || raw.score_complessivo || 0;
-  const breakdown = raw.score_breakdown || {};
-  const sezioni: any[] = raw.sezioni || raw.audit || [];
-  const priorita: string[] = raw.priorita_top_3 || raw.azioni_prioritarie || [];
-  const sintesi: string = raw.sintesi || "";
-  const lastAuditAt = raw.last_audit_at;
-  const nome = profile.business_profile?.nome || user?.email?.split("@")[0] || "Utente";
-  const headline = profile.business_profile?.headline || "";
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
-      {/* HEADER */}
-      <Card className="bg-card border-border/50 sticky top-0 z-20 backdrop-blur">
-        <CardContent className="p-6 flex items-start gap-4 flex-wrap">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center text-primary-foreground font-bold text-xl shrink-0">
-            {nome.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold">{nome}</h1>
-            {headline && <p className="text-sm text-muted-foreground">{headline}</p>}
-            {score > 0 && (
-              <div className="flex items-center gap-3 mt-2">
-                <div className={`px-3 py-1 rounded-lg border text-sm font-bold ${scoreColor(score)}`}>
-                  {score}/100
-                </div>
-                <span className="text-xs text-muted-foreground">{scoreLevel(score)}</span>
-                {lastAuditAt && (
-                  <span className="text-[11px] text-muted-foreground">
-                    · Aggiornato {new Date(lastAuditAt).toLocaleDateString("it-IT")}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="bg-primary hover:bg-primary-hover text-primary-foreground">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Aggiorna audit
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuItem onClick={() => setAuditDialog(true)}>
-                <Sparkles className="h-4 w-4 mr-2 text-primary" />
-                <div>
-                  <div className="font-medium">Veloce</div>
-                  <div className="text-xs text-muted-foreground">No scrape · ~15s · gratis</div>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setRescanDialog(true)}>
-                <RotateCcw className="h-4 w-4 mr-2 text-primary" />
-                <div>
-                  <div className="font-medium">Completo (rifai scrape)</div>
-                  <div className="text-xs text-muted-foreground">~45s · costa 1 scrape</div>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </CardContent>
-      </Card>
-
-      {/* §1 STATO */}
-      <section id="stato" className="space-y-4">
-        <SectionTitle icon={<BarChart3 className="h-5 w-5" />} title="Stato profilo" />
-        {score === 0 ? (
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              Nessun audit ancora disponibile. Clicca <strong>Aggiorna audit</strong> per generarne uno.
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-6 space-y-4">
-              {Object.keys(breakdown).length > 0 && (
-                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
-                  {Object.entries(breakdown).map(([k, v]) => {
-                    const val = Number(v) || 0;
-                    return (
-                      <div key={k}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="capitalize">{k.replace(/_/g, " ")}</span>
-                          <span className="font-bold tabular-nums">{val}</span>
-                        </div>
-                        <Progress value={val} className="h-2" />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {priorita.length > 0 && (
-                <div className="pt-3 border-t border-border/30">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Le 3 cose da fare subito
-                  </p>
-                  <div className="space-y-2">
-                    {priorita.slice(0, 3).map((p, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {i + 1}
-                        </div>
-                        <p className="text-sm">{p}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {sintesi && (
-                <p className="text-sm text-muted-foreground leading-relaxed pt-3 border-t border-border/30">
-                  {sintesi}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      {/* §2 CHI SEI */}
-      <section id="chi-sei">
-        <SectionTitle icon={<UserCheck className="h-5 w-5" />} title="Chi sei" />
-        <ChiSeiSection />
-      </section>
-
-      {/* §3 BRAND VOICE */}
-      <section id="brand-voice">
-        <SectionTitle icon={<Palette className="h-5 w-5" />} title="Brand voice" />
-        <BrandVoiceSection />
-      </section>
-
-      {/* §4 AUDIT */}
-      <section id="audit">
-        <SectionTitle icon={<Wand2 className="h-5 w-5" />} title="Audit per sezione" />
-        {sezioni.length === 0 ? (
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              Lancia un audit per vedere il dettaglio delle sezioni.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3">
-            {sezioni.map((s, i) => (
-              <SezioneCard
-                key={i}
-                sezione={s}
-                defaultExpanded={i < 2}
-                onRewrite={(initialFeedback) => setRewriteDialog({ name: s.nome, initialFeedback })}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* §5 BANNER */}
-      <section id="banner">
-        <SectionTitle icon={<Flag className="h-5 w-5" />} title="Banner profilo" />
-        <Card className="bg-card border-border/50">
-          <CardContent className="p-6 flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <p className="text-sm font-medium">Banner LinkedIn 1584×396</p>
-              <p className="text-xs text-muted-foreground">Concept + palette + 3 prompt per generatori AI.</p>
-            </div>
-            <Button onClick={() => setBannerDialog(true)} className="bg-primary hover:bg-primary-hover text-primary-foreground">
-              <ImageIcon className="h-4 w-4 mr-2" />
-              Genera brief banner
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* §6 DATI LINKEDIN */}
-      <section id="dati-linkedin">
-        <Collapsible>
-          <Card className="bg-card border-border/50">
-            <CollapsibleTrigger asChild>
-              <button className="w-full p-5 flex items-center justify-between hover:bg-accent/40 transition-colors text-left">
-                <div>
-                  <p className="text-sm font-medium">Dati LinkedIn</p>
-                  <p className="text-xs text-muted-foreground">
-                    {profile.linkedin_url || "URL non impostato"}
-                  </p>
-                </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="p-6 pt-0 space-y-3">
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {lastAuditAt && <p>Ultimo audit: {new Date(lastAuditAt).toLocaleString("it-IT")}</p>}
-                  <p>Scrape quota oggi: {profile.scrapes_used_today}/{profile.scrapes_daily_limit}</p>
-                </div>
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                    Vedi dati grezzi (JSON)
-                  </summary>
-                  <pre className="mt-2 p-3 bg-surface/50 rounded-lg overflow-auto max-h-80 text-[10px]">
-                    {JSON.stringify(profile.raw_profile_data, null, 2)}
-                  </pre>
-                </details>
-                <Button
-                  variant="outline" size="sm"
-                  onClick={() => setRescanDialog(true)}
-                  disabled={profile.scrapes_used_today >= profile.scrapes_daily_limit}
-                  className="border-border/50"
-                >
-                  <RotateCcw className="h-3 w-3 mr-1.5" />
-                  Rifai scrape LinkedIn (costa 1 scrape)
-                </Button>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      </section>
-
-      {/* DIALOGS */}
-      <UpdateAuditDialog
-        open={auditDialog} onClose={() => setAuditDialog(false)}
-        profile={profile} updateRawProfileData={updateRawProfileData} consumeSkillRun={consumeSkillRun} logRun={logRun}
-      />
-      <RescanDialog
-        open={rescanDialog} onClose={() => setRescanDialog(false)}
-        profile={profile} userId={user?.id || ""}
-        updateRawProfileData={updateRawProfileData} consumeSkillRun={consumeSkillRun} logRun={logRun}
-        fetchProfile={fetchProfile}
-      />
-      <BannerBriefDialog
-        open={bannerDialog} onClose={() => setBannerDialog(false)}
-        profile={profile} userId={user?.id || ""} consumeSkillRun={consumeSkillRun} logRun={logRun}
-      />
-      <RewriteSectionDialog
-        sectionName={rewriteDialog?.name ?? null}
-        initialFeedback={rewriteDialog?.initialFeedback ?? ""}
-        onClose={() => setRewriteDialog(null)}
-        sezioni={sezioni} profile={profile} userId={user?.id || ""}
-        raw={raw} updateRawProfileData={updateRawProfileData} consumeSkillRun={consumeSkillRun} logRun={logRun}
-      />
-    </div>
-  );
-}
-
-function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">{icon}</div>
-      <h2 className="text-lg font-semibold">{title}</h2>
-    </div>
-  );
-}
-
-// ============================================================================
-// §2 CHI SEI
-// ============================================================================
-function ChiSeiSection() {
-  const { profile, updateProfile, updateRawProfileData } = useProfile();
-  const initial = useMemo<BusinessProfile>(() => ({
-    nome: "", headline: "", settore: "", chi_e: "", value_proposition: "",
-    tone_of_voice: "Diretto e pratico", punti_forza: [], aree_miglioramento: [], tags: [],
-    ...(profile?.business_profile || {}),
-  }), [profile?.business_profile]);
-
-  const [local, setLocal] = useState<BusinessProfile>(initial);
-  const [targetDesc, setTargetDesc] = useState<string>("");
-  const [targetPains, setTargetPains] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setLocal(initial);
-    const tb = (profile?.raw_profile_data as any)?.target_buyer || {};
-    setTargetDesc(tb.descrizione || "");
-    setTargetPains(Array.isArray(tb.pain_points) ? tb.pain_points : []);
-  }, [initial, profile?.raw_profile_data]);
-
-  const dirty = useMemo(() => {
-    const tbStored = (profile?.raw_profile_data as any)?.target_buyer || {};
-    const tbStoredJson = JSON.stringify({ descrizione: tbStored.descrizione || "", pain_points: tbStored.pain_points || [] });
-    const tbLocalJson = JSON.stringify({ descrizione: targetDesc, pain_points: targetPains });
-    return JSON.stringify(local) !== JSON.stringify(initial) || tbStoredJson !== tbLocalJson;
-  }, [local, initial, targetDesc, targetPains, profile?.raw_profile_data]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    await updateProfile({ business_profile: local as any });
-    const newRaw = {
-      ...((profile?.raw_profile_data as any) || {}),
-      target_buyer: { descrizione: targetDesc, pain_points: targetPains },
-    };
-    await updateRawProfileData(newRaw);
-    setSaving(false);
-    toast.success("Profilo salvato");
-  };
-
-  return (
-    <Card className="bg-card border-border/50">
-      <CardContent className="p-6 space-y-4">
-        <Field label="Nome / Chi sei">
-          <Input value={local.nome} onChange={(e) => setLocal({ ...local, nome: e.target.value })} className="bg-surface border-border/50" />
-        </Field>
-        <Field label="Headline LinkedIn (max 220)">
-          <Input value={local.headline} maxLength={220} onChange={(e) => setLocal({ ...local, headline: e.target.value })} className="bg-surface border-border/50" />
-        </Field>
-        <Field label="Settore">
-          <Input value={local.settore} onChange={(e) => setLocal({ ...local, settore: e.target.value })} className="bg-surface border-border/50" />
-        </Field>
-        <Field label="Value Proposition">
-          <Textarea rows={3} value={local.value_proposition} onChange={(e) => setLocal({ ...local, value_proposition: e.target.value })} className="bg-surface border-border/50" />
-        </Field>
-        <Field label="Tone of voice">
-          <Select value={local.tone_of_voice} onValueChange={(v) => setLocal({ ...local, tone_of_voice: v })}>
-            <SelectTrigger className="bg-surface border-border/50"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Diretto e pratico">Diretto e pratico</SelectItem>
-              <SelectItem value="Consultivo e autorevole">Consultivo e autorevole</SelectItem>
-              <SelectItem value="Amichevole">Amichevole</SelectItem>
-              <SelectItem value="Tecnico">Tecnico</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <TagEditor label="Punti di forza" tags={local.punti_forza || []} onChange={(t) => setLocal({ ...local, punti_forza: t })} />
-        <TagEditor label="Aree di miglioramento" tags={local.aree_miglioramento || []} onChange={(t) => setLocal({ ...local, aree_miglioramento: t })} />
-        <TagEditor label="Tags" tags={local.tags || []} onChange={(t) => setLocal({ ...local, tags: t })} />
-
-        <div className="pt-4 border-t border-border/30 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Target buyer</p>
-          <Field label="Descrizione">
-            <Textarea rows={2} value={targetDesc} onChange={(e) => setTargetDesc(e.target.value)} className="bg-surface border-border/50" />
-          </Field>
-          <TagEditor label="Pain points" tags={targetPains} onChange={setTargetPains} />
-          <p className="text-xs text-muted-foreground">
-            Hai più di un target? <Link to="/icps" className="text-primary hover:underline">Gestisci i tuoi ICP</Link>
-          </p>
-        </div>
-
-        <div className="flex justify-end pt-2">
-          <Button onClick={handleSave} disabled={!dirty || saving} className="bg-primary hover:bg-primary-hover text-primary-foreground">
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salva modifiche
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TagEditor({ label, tags, onChange }: { label: string; tags: string[]; onChange: (t: string[]) => void }) {
-  const [input, setInput] = useState("");
-  return (
-    <Field label={label}>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {tags.map((t, i) => (
-          <Badge key={i} variant="outline" className="border-border/50 gap-1">
-            {t}
-            <button onClick={() => onChange(tags.filter((_, j) => j !== i))} className="hover:text-destructive">
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && input.trim()) {
-              e.preventDefault();
-              onChange([...tags, input.trim()]);
-              setInput("");
-            }
-          }}
-          placeholder="Aggiungi e premi Invio"
-          className="bg-surface border-border/50 h-9 text-xs"
-        />
-        <Button
-          type="button" variant="outline" size="sm"
-          onClick={() => { if (input.trim()) { onChange([...tags, input.trim()]); setInput(""); } }}
-          className="border-border/50"
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
-      </div>
-    </Field>
-  );
-}
-
-// ============================================================================
-// §3 BRAND VOICE
-// ============================================================================
-const DEFAULT_BRAND: BrandKit = { color: "#FF6A1C", tone: "corporate" };
-const TONE_OPTIONS: Array<{ value: BrandKit["tone"]; label: string; description: string }> = [
-  { value: "corporate", label: "Corporate", description: "Professionale, autorevole." },
-  { value: "playful", label: "Playful", description: "Caldo, ironico, narrativo." },
-  { value: "minimal", label: "Minimal", description: "Asciutto, frasi corte." },
-  { value: "bold", label: "Bold", description: "Contrarian, opinionato." },
-];
-
-function BrandVoiceSection() {
-  const { profile, updateProfile } = useProfile();
-  const [color, setColor] = useState<string>(DEFAULT_BRAND.color);
-  const [tone, setTone] = useState<BrandKit["tone"]>(DEFAULT_BRAND.tone);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    const bk = ((profile as any)?.brand_kit ?? {}) as Partial<BrandKit>;
-    setColor(bk.color || DEFAULT_BRAND.color);
-    setTone(bk.tone || DEFAULT_BRAND.tone);
-    setDirty(false);
-  }, [profile]);
-
-  const handleSave = async () => {
-    if (!isValidHex(color)) { toast.error("Colore non valido"); return; }
-    setSaving(true);
-    await updateProfile({ brand_kit: { color: color.toUpperCase(), tone } as any });
-    setSaving(false); setDirty(false);
-    toast.success("Brand kit salvato");
-  };
-
-  return (
-    <Card className="bg-card border-border/50">
-      <CardContent className="p-6 space-y-5">
-        <div>
-          <p className="text-sm font-medium mb-2">Colore primario</p>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="w-14 h-14 rounded-xl border-2 border-border/30 shrink-0"
-              style={{ backgroundColor: isValidHex(color) ? color : "#888" }} />
-            <input type="color" value={isValidHex(color) ? color : "#FF6A1C"}
-              onChange={(e) => { setColor(e.target.value); setDirty(true); }}
-              className="h-10 w-16 rounded-md border border-border/50 cursor-pointer bg-surface" />
-            <Input value={color} onChange={(e) => { setColor(e.target.value); setDirty(true); }}
-              className="bg-surface border-border/50 max-w-[160px] font-mono uppercase h-10" />
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium mb-2">Tone of voice</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {TONE_OPTIONS.map((t) => {
-              const active = tone === t.value;
-              return (
-                <button
-                  key={t.value} type="button"
-                  onClick={() => { setTone(t.value); setDirty(true); }}
-                  className={`text-xs px-3 py-2 rounded-lg border transition-colors text-left ${
-                    active ? "bg-primary/10 border-primary text-primary" : "bg-surface border-border/50 hover:border-primary/50"
-                  }`}
-                >
-                  <span className="font-medium block">{t.label}</span>
-                  <span className="text-[10px] opacity-80 line-clamp-1">{t.description}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div
-          className="p-4 rounded-xl border-2 text-sm"
-          style={{
-            background: `linear-gradient(135deg, ${color}15, ${color}05)`,
-            borderColor: `${color}40`,
-          }}
-        >
-          I tuoi post saranno scritti in tone <strong>{tone}</strong>, e i visual brief
-          consiglieranno palette coerenti con il tuo colore primario.
-        </div>
-
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving || !dirty || !isValidHex(color)}
-            className="bg-primary hover:bg-primary-hover text-primary-foreground">
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salva brand kit
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ============================================================================
-// §4 SEZIONE CARD — v3.8.6 redesign: 2 colonne, collapsible, quick edit chips
-// ============================================================================
-const REWRITABLE = new Set(["Headline", "About", "Featured"]);
-
-const QUICK_FEEDBACK_CHIPS: { label: string; value: string }[] = [
-  { label: "+ Più diretto", value: "Riscrivi in tono più diretto e secco, frasi corte, niente fronzoli." },
-  { label: "+ Aggiungi numeri", value: "Aggiungi 1-2 dati concreti (anni esperienza, clienti tipici, risultati) per dare prova." },
-  { label: "+ Tono bold", value: "Tono più contrarian e opinionato, posizione netta, senza paura di polarizzare." },
-];
-
-function SezioneCard({
-  sezione,
-  onRewrite,
-  defaultExpanded = false,
-}: {
-  sezione: any;
-  onRewrite: (initialFeedback?: string) => void;
-  defaultExpanded?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const score = Number(sezione.score) || 0;
-  const rewritable = REWRITABLE.has(sezione.nome);
-  const proposto: string = sezione.esempio_riscritto || sezione.riscrittura || "";
-
-  return (
-    <Card className="bg-card border-border/50 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full px-5 py-4 flex items-center justify-between gap-4 hover:bg-accent/30 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={`px-2 py-0.5 rounded text-xs font-bold border shrink-0 ${scoreColor(score)}`}>
-            {score}/100
-          </div>
-          <h3 className="font-semibold text-sm truncate">{sezione.nome}</h3>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {rewritable && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => { e.stopPropagation(); onRewrite(); }}
-              className="h-7 gap-1.5 text-xs"
-            >
-              <Sparkles className="h-3 w-3" />
-              Riscrivi
-            </Button>
-          )}
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground rotate-180 transition-transform" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
-          )}
-        </div>
-      </button>
-
-      {expanded && (
-        <CardContent className="px-5 pb-5 pt-0 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Cosa c'è ora sul tuo profilo
-              </p>
-              <div className="rounded-md border border-border/50 bg-surface/40 p-3 text-xs leading-relaxed">
-                {sezione.stato_attuale ? (
-                  <p className="whitespace-pre-wrap">{sezione.stato_attuale}</p>
-                ) : (
-                  <p className="italic text-muted-foreground">Sezione vuota o dato non disponibile.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {sezione.problema && (
-                <div className="flex gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs"><span className="font-semibold">Problema:</span> {sezione.problema}</p>
-                </div>
-              )}
-              {sezione.soluzione && (
-                <div className="flex gap-2">
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <p className="text-xs"><span className="font-semibold">Soluzione:</span> {sezione.soluzione}</p>
-                </div>
-              )}
-              {sezione.azione && sezione.azione !== sezione.soluzione && (
-                <div className="flex gap-2">
-                  <CheckCircle className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                  <p className="text-xs"><span className="font-semibold">Azione:</span> {sezione.azione}</p>
-                </div>
-              )}
-              {sezione.guida && (
-                <div className="flex gap-2">
-                  <Flag className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    <span className="font-semibold">Come modificarlo su LinkedIn:</span> {sezione.guida}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {proposto && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  Testo pronto da copiare
-                </p>
-                <CopyBtn text={proposto} />
-              </div>
-              <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
-                <p className="text-xs whitespace-pre-wrap leading-relaxed">{proposto}</p>
-              </div>
-            </div>
-          )}
-
-          {rewritable && (
-            <div className="flex items-center gap-2 flex-wrap pt-1">
-              <span className="text-[11px] text-muted-foreground mr-1">Riscrittura veloce:</span>
-              {QUICK_FEEDBACK_CHIPS.map((chip) => (
-                <Button
-                  key={chip.label}
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onRewrite(chip.value)}
-                  className="h-7 text-[11px] border-border/50 hover:border-primary/50 hover:text-primary"
-                >
-                  {chip.label}
-                </Button>
-              ))}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onRewrite("")}
-                className="h-7 text-[11px] gap-1"
-              >
-                <Wand2 className="h-3 w-3" />
-                Custom…
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-// ============================================================================
-// DIALOGS
-// ============================================================================
-function UpdateAuditDialog({
-  open, onClose, profile, updateRawProfileData, consumeSkillRun, logRun,
-}: any) {
-  const [loading, setLoading] = useState(false);
-  const [obiettivo, setObiettivo] = useState("");
-  // v3.8.6 fix #2: feedback utente per rifare audit con direzione diversa.
-  const [feedback, setFeedback] = useState("");
-
-  const runAudit = async () => {
-    setLoading(true);
-    const start = Date.now();
-    const trimmedFeedback = feedback.trim();
-    const result = await callSkill("profile-optimizer", {
-      profilo_business: profile.business_profile,
-      raw_profile_data: profile.raw_profile_data,
-      obiettivo: obiettivo || (profile.business_profile as any)?.value_proposition || "",
-      brand_kit: (profile as any).brand_kit || {},
-      // v3.8.6: opzionale. Se presente, n8n rifà l'audit da zero secondo il feedback.
-      feedback_utente: trimmedFeedback || undefined,
-    });
-    if (!result.ok) {
-      setLoading(false);
-      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
-      await logRun({ skill: "profile-optimizer", input: { obiettivo, feedback_utente: trimmedFeedback }, output: null, status: "error", is_scrape: false, error_message: err.message });
-      return;
-    }
-    const d = result.data as any;
-    const newRaw = {
-      ...(profile.raw_profile_data || {}),
-      score_totale: d.score_complessivo ?? d.score_totale,
-      score_breakdown: d.score_breakdown,
-      sezioni: d.audit || d.sezioni,
-      priorita_top_3: d.priorita_top_3,
-      sintesi: d.sintesi,
-      last_audit_at: new Date().toISOString(),
-      last_audit_mode: "quick",
-    };
-    await updateRawProfileData(newRaw);
-    await logRun({ skill: "profile-optimizer", input: { obiettivo, feedback_utente: trimmedFeedback }, output: d, status: "completed", is_scrape: false, duration_ms: Date.now() - start });
-    await consumeSkillRun(false);
-    setLoading(false);
-    setFeedback("");
-    toast.success("Audit aggiornato");
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Aggiorna audit (Veloce)</DialogTitle>
-          <DialogDescription>
-            Ricalcola score e riscritture senza rifare scrape LinkedIn. ~15s. Costa 1 skill-run.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Field label="Obiettivo (opzionale)">
-            <Textarea rows={2} value={obiettivo} onChange={(e) => setObiettivo(e.target.value)}
-              placeholder="Es. trovare 10 clienti enterprise nei prossimi 90 giorni"
-              className="bg-surface border-border/50" />
-          </Field>
-          <Field label="Cosa vuoi cambiare? (opzionale)">
-            <Textarea
-              rows={3}
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Es. 'Ha esagerato col CRM, vorrei un posizionamento più ampio da consulente commerciale.'"
-              className="bg-surface border-border/50 resize-none"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1.5">
-              Se compilato, l'audit viene rifatto da zero secondo le tue indicazioni: headline, about, priorità.
-              Non un piccolo ritocco.
+      <div className="max-w-5xl mx-auto space-y-6 pb-12">
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold">Il mio profilo</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tutto quello che Ember sa di te + le 3 cose da sistemare adesso.
             </p>
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={loading}>Annulla</Button>
-          <Button onClick={runAudit} disabled={loading} className="bg-primary hover:bg-primary-hover text-primary-foreground">
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            Lancia audit
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RescanDialog({
-  open, onClose, profile, userId, updateRawProfileData, consumeSkillRun, logRun, fetchProfile,
-}: any) {
-  const [loading, setLoading] = useState(false);
-  const noQuota = profile.scrapes_used_today >= profile.scrapes_daily_limit;
-
-  const handleRescan = async () => {
-    if (!profile.linkedin_url) { toast.error("URL LinkedIn mancante"); return; }
-    setLoading(true);
-    const start = Date.now();
-    const result = await callSkill("auto-profile-setup", {
-      user_id: userId, linkedin_url: profile.linkedin_url,
-    });
-    if (!result.ok) {
-      setLoading(false);
-      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
-      await logRun({ skill: "auto-profile-setup", input: { linkedin_url: profile.linkedin_url }, output: null, status: "error", is_scrape: true, error_message: err.message });
-      return;
-    }
-    const d = result.data as any;
-    await updateRawProfileData({ ...d, last_audit_at: new Date().toISOString(), last_audit_mode: "full" });
-    await logRun({ skill: "auto-profile-setup", input: { linkedin_url: profile.linkedin_url }, output: d, status: "completed", is_scrape: true, duration_ms: Date.now() - start });
-    await consumeSkillRun(true);
-    await fetchProfile();
-    setLoading(false);
-    toast.success("Profilo riscansionato");
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Rifai scrape LinkedIn</DialogTitle>
-          <DialogDescription>
-            Riscansiona il tuo profilo e ricalcola audit completo. ~45s.
-            Costa <strong>1 scrape</strong> ({profile.scrapes_daily_limit - profile.scrapes_used_today} disponibili oggi).
-          </DialogDescription>
-        </DialogHeader>
-        {noQuota && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>Quota scrape esaurita. Riprova domani o passa a un piano superiore.</AlertDescription>
-          </Alert>
-        )}
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={loading}>Annulla</Button>
-          <Button onClick={handleRescan} disabled={loading || noQuota}
-            className="bg-primary hover:bg-primary-hover text-primary-foreground">
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-            Rifai scrape
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function BannerBriefDialog({ open, onClose, profile, userId, consumeSkillRun, logRun }: any) {
-  const [loading, setLoading] = useState(false);
-  const [output, setOutput] = useState<any>(null);
-
-  const generate = async () => {
-    setLoading(true);
-    const start = Date.now();
-    const result = await callSkill("profile-banner-brief", {
-      user_id: userId,
-      profilo_business: profile.business_profile,
-      brand_kit: (profile as any).brand_kit || {},
-    });
-    if (!result.ok) {
-      setLoading(false);
-      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
-      await logRun({ skill: "profile-banner-brief", input: {}, output: null, status: "error", is_scrape: false, error_message: err.message });
-      return;
-    }
-    setOutput(result.data);
-    await logRun({ skill: "profile-banner-brief", input: {}, output: result.data, status: "completed", is_scrape: false, duration_ms: Date.now() - start });
-    await consumeSkillRun(false);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (open && !output && !loading) generate();
-    if (!open) setOutput(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Brief banner LinkedIn (1584×396)</DialogTitle>
-          <DialogDescription>Concept + palette + 3 prompt da incollare su Midjourney/Flux/DALL·E.</DialogDescription>
-        </DialogHeader>
-        {loading && <div className="py-12 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></div>}
-        {output && (
-          <div className="space-y-4 text-sm">
-            {output.concept && (<div><p className="text-xs font-semibold uppercase text-muted-foreground mb-1">Concept</p><p>{output.concept}</p></div>)}
-            {output.palette && (
-              <div>
-                <p className="text-xs font-semibold uppercase text-muted-foreground mb-1">Palette</p>
-                <div className="flex gap-2">
-                  {(Array.isArray(output.palette) ? output.palette : Object.values(output.palette)).map((c: any, i: number) => (
-                    <div key={i} className="w-12 h-12 rounded-lg border border-border/30" style={{ backgroundColor: c }} title={c} />
-                  ))}
-                </div>
-              </div>
-            )}
-            {output.prompts && Array.isArray(output.prompts) && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Prompt</p>
-                {output.prompts.map((p: any, i: number) => (
-                  <div key={i} className="bg-surface/50 p-3 rounded-lg border border-border/30">
-                    <div className="flex justify-between items-start gap-2">
-                      <p className="text-xs whitespace-pre-wrap flex-1 font-mono">{typeof p === "string" ? p : p.prompt || JSON.stringify(p)}</p>
-                      <CopyBtn text={typeof p === "string" ? p : p.prompt || ""} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {output.safe_zone && (<div className="text-xs text-muted-foreground"><strong>Safe zone:</strong> {output.safe_zone}</div>)}
           </div>
-        )}
-        <DialogFooter>
-          {output && (
-            <Button variant="outline" onClick={() => { setOutput(null); generate(); }} disabled={loading} className="border-border/50">
-              <RefreshCw className="h-4 w-4 mr-2" /> Rigenera
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 border-border/50">
+                  <div
+                    className="w-3.5 h-3.5 rounded-full border border-border/50"
+                    style={{ backgroundColor: profile.brand_kit?.color || "#FF6A1C" }}
+                  />
+                  <span className="text-xs">{profile.brand_kit?.tone || "corporate"}</span>
+                  <Palette className="h-3.5 w-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72" align="end">
+                <BrandVoiceWidget />
+              </PopoverContent>
+            </Popover>
+            <Button
+              onClick={() => setAuditDialogOpen(true)}
+              className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground"
+            >
+              <Sparkles className="h-4 w-4" />
+              Aggiorna audit
             </Button>
-          )}
-          <Button variant="ghost" onClick={onClose}>Chiudi</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RewriteSectionDialog({
-  sectionName, initialFeedback = "", onClose, sezioni, profile, userId, raw, updateRawProfileData, consumeSkillRun, logRun,
-}: any) {
-  const open = sectionName !== null;
-  const section = sezioni.find((s: any) => s.nome === sectionName);
-  const [feedback, setFeedback] = useState(initialFeedback);
-  const [loading, setLoading] = useState(false);
-  const [newText, setNewText] = useState<string | null>(null);
-
-  // v3.8.6: ogni volta che il dialog si apre o cambia il chip, pre-compila il feedback.
-  useEffect(() => {
-    if (open) { setFeedback(initialFeedback || ""); setNewText(null); }
-    else { setFeedback(""); setNewText(null); }
-  }, [open, initialFeedback]);
-
-  const generate = async () => {
-    if (!section || !userId) return;
-    setLoading(true);
-    const start = Date.now();
-    const result = await callRegenerateSection({
-      user_id: userId,
-      section: section.nome,
-      stato_attuale: section.stato_attuale || "",
-      current_rewrite: section.riscrittura || section.esempio_riscritto || "",
-      profile_context: (profile.business_profile || {}) as any,
-      user_feedback: feedback || undefined,
-    });
-    if (!result.ok) {
-      setLoading(false);
-      const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
-      await logRun({ skill: "regenerate-section", input: { section: section.nome }, output: null, status: "error", is_scrape: false, error_message: err.message });
-      return;
-    }
-    setNewText(result.data.new_rewrite);
-    await logRun({ skill: "regenerate-section", input: { section: section.nome }, output: result.data, status: "completed", is_scrape: false, duration_ms: Date.now() - start });
-    await consumeSkillRun(false);
-    setLoading(false);
-  };
-
-  const saveToProfile = async () => {
-    if (!newText) return;
-    const updated = {
-      ...raw,
-      sezioni: (raw.sezioni || []).map((s: any) =>
-        s.nome === sectionName ? { ...s, riscrittura: newText } : s,
-      ),
-    };
-    await updateRawProfileData(updated);
-    toast.success("Riscrittura salvata. Copiala su LinkedIn quando vuoi.");
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Riscrivi {sectionName}</DialogTitle>
-          <DialogDescription>
-            Genera una nuova versione di questa sezione. Costa 1 skill-run.
-          </DialogDescription>
-        </DialogHeader>
-        {section && (
-          <div className="space-y-3 text-sm">
-            {section.stato_attuale && (
-              <div className="bg-surface/50 p-3 rounded-lg border border-border/30">
-                <p className="text-[10px] uppercase text-muted-foreground mb-1">Attuale</p>
-                <p className="text-xs whitespace-pre-wrap line-clamp-4">{section.stato_attuale}</p>
-              </div>
-            )}
-            <Field label="Feedback (opzionale)">
-              <Textarea rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Es. più diretto, più tecnico, includi target..."
-                className="bg-surface border-border/50" />
-            </Field>
-            {newText && (
-              <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
-                <div className="flex justify-between items-start gap-2 mb-1">
-                  <p className="text-[10px] uppercase text-primary">Nuova versione</p>
-                  <CopyBtn text={newText} />
-                </div>
-                <p className="text-xs whitespace-pre-wrap">{newText}</p>
-              </div>
-            )}
           </div>
-        )}
-        <DialogFooter>
-          {newText ? (
-            <>
-              <Button variant="outline" onClick={generate} disabled={loading} className="border-border/50">
-                <RefreshCw className="h-4 w-4 mr-2" /> Rigenera
+        </div>
+
+        {/* SEZIONE 1: STATO */}
+        <StatoSection audit={hasAudit ? audit : null} />
+
+        {/* SEZIONE 2: AUDIT (header LinkedIn-like + 7 card sezione) */}
+        <div className="space-y-4">
+          <ProfileHeaderCard businessProfile={profile.business_profile} />
+          <AuditSection sezioni={audit?.sezioni || []} />
+        </div>
+
+        {/* FOOTER */}
+        <Card className="border-dashed border-border/50">
+          <CardContent className="p-5 flex items-center justify-between flex-wrap gap-3">
+            <p className="text-sm text-muted-foreground">Altre azioni sul profilo</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBannerDialogOpen(true)}
+                className="gap-2 border-border/50"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                Crea brief banner
               </Button>
-              <Button onClick={saveToProfile} className="bg-primary hover:bg-primary-hover text-primary-foreground">
-                <Save className="h-4 w-4 mr-2" /> Salva nel profilo
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRawDialogOpen(true)}
+                className="gap-2"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Vedi profilo grezzo
               </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={onClose} disabled={loading}>Annulla</Button>
-              <Button onClick={generate} disabled={loading} className="bg-primary hover:bg-primary-hover text-primary-foreground">
-                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-                Genera
-              </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* DIALOGS */}
+        <UpdateAuditDialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen} />
+        <BannerBriefDialog open={bannerDialogOpen} onOpenChange={setBannerDialogOpen} />
+        <RawLinkedInDialog open={rawDialogOpen} onOpenChange={setRawDialogOpen} />
+      </div>
+    </AppLayout>
   );
 }
