@@ -507,7 +507,9 @@ function UnifiedProfileContent() {
         profile={profile} userId={user?.id || ""} consumeSkillRun={consumeSkillRun} logRun={logRun}
       />
       <RewriteSectionDialog
-        sectionName={rewriteDialog} onClose={() => setRewriteDialog(null)}
+        sectionName={rewriteDialog?.name ?? null}
+        initialFeedback={rewriteDialog?.initialFeedback ?? ""}
+        onClose={() => setRewriteDialog(null)}
         sezioni={sezioni} profile={profile} userId={user?.id || ""}
         raw={raw} updateRawProfileData={updateRawProfileData} consumeSkillRun={consumeSkillRun} logRun={logRun}
       />
