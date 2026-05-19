@@ -419,7 +419,12 @@ function UnifiedProfileContent() {
         ) : (
           <div className="grid gap-3">
             {sezioni.map((s, i) => (
-              <SezioneCard key={i} sezione={s} onRewrite={() => setRewriteDialog(s.nome)} />
+              <SezioneCard
+                key={i}
+                sezione={s}
+                defaultExpanded={i < 2}
+                onRewrite={(initialFeedback) => setRewriteDialog({ name: s.nome, initialFeedback })}
+              />
             ))}
           </div>
         )}
