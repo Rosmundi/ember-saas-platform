@@ -910,20 +910,25 @@ function UpdateAuditDialog({
 }: any) {
   const [loading, setLoading] = useState(false);
   const [obiettivo, setObiettivo] = useState("");
+  // v3.8.6 fix #2: feedback utente per rifare audit con direzione diversa.
+  const [feedback, setFeedback] = useState("");
 
   const runAudit = async () => {
     setLoading(true);
     const start = Date.now();
+    const trimmedFeedback = feedback.trim();
     const result = await callSkill("profile-optimizer", {
       profilo_business: profile.business_profile,
       raw_profile_data: profile.raw_profile_data,
       obiettivo: obiettivo || (profile.business_profile as any)?.value_proposition || "",
       brand_kit: (profile as any).brand_kit || {},
+      // v3.8.6: opzionale. Se presente, n8n rifà l'audit da zero secondo il feedback.
+      feedback_utente: trimmedFeedback || undefined,
     });
     if (!result.ok) {
       setLoading(false);
       const err = (result as { ok: false; error: any }).error; toast.error(emberErrorMessage(err));
-      await logRun({ skill: "profile-optimizer", input: { obiettivo }, output: null, status: "error", is_scrape: false, error_message: err.message });
+      await logRun({ skill: "profile-optimizer", input: { obiettivo, feedback_utente: trimmedFeedback }, output: null, status: "error", is_scrape: false, error_message: err.message });
       return;
     }
     const d = result.data as any;
@@ -938,9 +943,10 @@ function UpdateAuditDialog({
       last_audit_mode: "quick",
     };
     await updateRawProfileData(newRaw);
-    await logRun({ skill: "profile-optimizer", input: { obiettivo }, output: d, status: "completed", is_scrape: false, duration_ms: Date.now() - start });
+    await logRun({ skill: "profile-optimizer", input: { obiettivo, feedback_utente: trimmedFeedback }, output: d, status: "completed", is_scrape: false, duration_ms: Date.now() - start });
     await consumeSkillRun(false);
     setLoading(false);
+    setFeedback("");
     toast.success("Audit aggiornato");
     onClose();
   };
@@ -959,6 +965,19 @@ function UpdateAuditDialog({
             <Textarea rows={2} value={obiettivo} onChange={(e) => setObiettivo(e.target.value)}
               placeholder="Es. trovare 10 clienti enterprise nei prossimi 90 giorni"
               className="bg-surface border-border/50" />
+          </Field>
+          <Field label="Cosa vuoi cambiare? (opzionale)">
+            <Textarea
+              rows={3}
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="Es. 'Ha esagerato col CRM, vorrei un posizionamento più ampio da consulente commerciale.'"
+              className="bg-surface border-border/50 resize-none"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              Se compilato, l'audit viene rifatto da zero secondo le tue indicazioni: headline, about, priorità.
+              Non un piccolo ritocco.
+            </p>
           </Field>
         </div>
         <DialogFooter>
