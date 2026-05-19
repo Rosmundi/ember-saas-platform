@@ -58,6 +58,8 @@ function rowToProfile(row: ProfileRow): Profile {
     searches_daily_limit: row.searches_daily_limit ?? 0,
     searches_reset_at: row.searches_reset_at || null,
     watchlist_max_items: row.watchlist_max_items ?? 0,
+    // v3.8.6 fix #1: brand kit roundtrip (era salvato ma non riletto → form si resettava al refresh).
+    brand_kit: (row.brand_kit ?? null) as Profile["brand_kit"],
     trial_ends_at: row.trial_ends_at || "",
     created_at: row.created_at,
   };
