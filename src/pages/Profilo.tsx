@@ -249,7 +249,7 @@ function UnifiedProfileContent() {
   const [auditDialog, setAuditDialog] = useState(false);
   const [rescanDialog, setRescanDialog] = useState(false);
   const [bannerDialog, setBannerDialog] = useState(false);
-  const [rewriteDialog, setRewriteDialog] = useState<string | null>(null); // section name
+  const [rewriteDialog, setRewriteDialog] = useState<{ name: string; initialFeedback?: string } | null>(null);
 
   // Auto-open via query params (redirect compat)
   const action = searchParams.get("action");
