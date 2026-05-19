@@ -754,59 +754,150 @@ function BrandVoiceSection() {
 }
 
 // ============================================================================
-// §4 SEZIONE CARD
+// §4 SEZIONE CARD — v3.8.6 redesign: 2 colonne, collapsible, quick edit chips
 // ============================================================================
 const REWRITABLE = new Set(["Headline", "About", "Featured"]);
 
-function SezioneCard({ sezione, onRewrite }: { sezione: any; onRewrite: () => void }) {
+const QUICK_FEEDBACK_CHIPS: { label: string; value: string }[] = [
+  { label: "+ Più diretto", value: "Riscrivi in tono più diretto e secco, frasi corte, niente fronzoli." },
+  { label: "+ Aggiungi numeri", value: "Aggiungi 1-2 dati concreti (anni esperienza, clienti tipici, risultati) per dare prova." },
+  { label: "+ Tono bold", value: "Tono più contrarian e opinionato, posizione netta, senza paura di polarizzare." },
+];
+
+function SezioneCard({
+  sezione,
+  onRewrite,
+  defaultExpanded = false,
+}: {
+  sezione: any;
+  onRewrite: (initialFeedback?: string) => void;
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const score = Number(sezione.score) || 0;
   const rewritable = REWRITABLE.has(sezione.nome);
+  const proposto: string = sezione.esempio_riscritto || sezione.riscrittura || "";
+
   return (
-    <Card className="bg-card border-border/50">
-      <CardContent className="p-5 space-y-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-sm">{sezione.nome}</h3>
-            <div className={`px-2 py-0.5 rounded text-xs font-bold border ${scoreColor(score)}`}>
-              {score}/100
-            </div>
+    <Card className="bg-card border-border/50 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-5 py-4 flex items-center justify-between gap-4 hover:bg-accent/30 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`px-2 py-0.5 rounded text-xs font-bold border shrink-0 ${scoreColor(score)}`}>
+            {score}/100
           </div>
+          <h3 className="font-semibold text-sm truncate">{sezione.nome}</h3>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           {rewritable && (
-            <Button size="sm" variant="outline" onClick={onRewrite} className="border-border/50 hover:border-primary/50 hover:text-primary">
-              <Wand2 className="h-3 w-3 mr-1.5" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={(e) => { e.stopPropagation(); onRewrite(); }}
+              className="h-7 gap-1.5 text-xs"
+            >
+              <Sparkles className="h-3 w-3" />
               Riscrivi
             </Button>
           )}
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground rotate-180 transition-transform" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+          )}
         </div>
-        {sezione.stato_attuale && (
-          <p className="text-xs text-muted-foreground"><strong>Stato:</strong> <span className="line-clamp-2">{sezione.stato_attuale}</span></p>
-        )}
-        {sezione.problema && (
-          <p className="text-xs"><strong className="text-destructive">Problema:</strong> {sezione.problema}</p>
-        )}
-        {sezione.soluzione && (
-          <p className="text-xs"><strong className="text-emerald-400">Soluzione:</strong> {sezione.soluzione}</p>
-        )}
-        {sezione.guida && (
-          <p className="text-xs text-muted-foreground"><strong>Guida:</strong> {sezione.guida}</p>
-        )}
-        {sezione.esempio_riscritto && (
-          <div className="bg-surface/50 p-3 rounded-lg mt-2 border border-border/30">
-            <div className="flex justify-between items-start gap-2">
-              <p className="text-xs whitespace-pre-wrap flex-1">{sezione.esempio_riscritto}</p>
-              <CopyBtn text={sezione.esempio_riscritto} />
+      </button>
+
+      {expanded && (
+        <CardContent className="px-5 pb-5 pt-0 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Cosa c'è ora sul tuo profilo
+              </p>
+              <div className="rounded-md border border-border/50 bg-surface/40 p-3 text-xs leading-relaxed">
+                {sezione.stato_attuale ? (
+                  <p className="whitespace-pre-wrap">{sezione.stato_attuale}</p>
+                ) : (
+                  <p className="italic text-muted-foreground">Sezione vuota o dato non disponibile.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {sezione.problema && (
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs"><span className="font-semibold">Problema:</span> {sezione.problema}</p>
+                </div>
+              )}
+              {sezione.soluzione && (
+                <div className="flex gap-2">
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  <p className="text-xs"><span className="font-semibold">Soluzione:</span> {sezione.soluzione}</p>
+                </div>
+              )}
+              {sezione.azione && sezione.azione !== sezione.soluzione && (
+                <div className="flex gap-2">
+                  <CheckCircle className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs"><span className="font-semibold">Azione:</span> {sezione.azione}</p>
+                </div>
+              )}
+              {sezione.guida && (
+                <div className="flex gap-2">
+                  <Flag className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    <span className="font-semibold">Come modificarlo su LinkedIn:</span> {sezione.guida}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-        )}
-        {sezione.riscrittura && !sezione.esempio_riscritto && (
-          <div className="bg-primary/5 p-3 rounded-lg mt-2 border border-primary/20">
-            <div className="flex justify-between items-start gap-2">
-              <p className="text-xs whitespace-pre-wrap flex-1">{sezione.riscrittura}</p>
-              <CopyBtn text={sezione.riscrittura} />
+
+          {proposto && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Testo pronto da copiare
+                </p>
+                <CopyBtn text={proposto} />
+              </div>
+              <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
+                <p className="text-xs whitespace-pre-wrap leading-relaxed">{proposto}</p>
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
+          )}
+
+          {rewritable && (
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <span className="text-[11px] text-muted-foreground mr-1">Riscrittura veloce:</span>
+              {QUICK_FEEDBACK_CHIPS.map((chip) => (
+                <Button
+                  key={chip.label}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRewrite(chip.value)}
+                  className="h-7 text-[11px] border-border/50 hover:border-primary/50 hover:text-primary"
+                >
+                  {chip.label}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onRewrite("")}
+                className="h-7 text-[11px] gap-1"
+              >
+                <Wand2 className="h-3 w-3" />
+                Custom…
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
