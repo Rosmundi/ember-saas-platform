@@ -259,7 +259,7 @@ function UnifiedProfileContent() {
     if (action === "reaudit") setAuditDialog(true);
     if (regenerateSection) {
       const cap = regenerateSection.charAt(0).toUpperCase() + regenerateSection.slice(1);
-      setRewriteDialog(cap);
+      setRewriteDialog({ name: cap });
     }
     if (action || regenerateSection) {
       // Pulisci query per evitare ri-apertura su navigate-back
