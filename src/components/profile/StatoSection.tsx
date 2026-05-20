@@ -101,28 +101,34 @@ export function StatoSection({ audit }: { audit: any }) {
       <Card
         className="relative overflow-hidden bg-card border-border/50 md:col-span-1"
         style={{
-          backgroundImage: `radial-gradient(circle at top right, ${color}1a, transparent 60%)`,
+          backgroundImage: `radial-gradient(circle at 50% 25%, ${color}2a, transparent 70%)`,
         }}
       >
-        <CardContent className="p-5 flex flex-row md:flex-col items-center gap-4 md:gap-3 h-full">
+        {/* glow orb di sfondo */}
+        <div
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full opacity-25 blur-3xl pointer-events-none"
+          style={{ backgroundColor: color }}
+        />
+        <CardContent className="relative p-6 flex flex-col items-center justify-center text-center gap-5 h-full min-h-[280px]">
           <ScoreRing score={score} color={color} />
 
-          <div className="flex flex-col items-start md:items-center gap-1.5 md:text-center">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">
               <TrendingUp className="h-3 w-3" />
               Profile score
             </div>
             <div
-              className="text-xs font-bold px-2.5 py-0.5 rounded-full border"
+              className="text-sm font-bold px-3.5 py-1 rounded-full border backdrop-blur-sm"
               style={{
                 color,
-                borderColor: `${color}40`,
-                backgroundColor: `${color}15`,
+                borderColor: `${color}55`,
+                backgroundColor: `${color}1f`,
+                boxShadow: `0 0 20px ${color}33`,
               }}
             >
               {livello}
             </div>
-            <p className="text-[11px] text-muted-foreground leading-snug">
+            <p className="text-xs text-muted-foreground leading-snug max-w-[220px]">
               {score >= 60 ? "Sei sopra la media" : "C'è margine di crescita"}
             </p>
           </div>
