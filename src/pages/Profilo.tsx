@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverTrigger, PopoverContent,
 } from "@/components/ui/popover";
-import { Sparkles, Palette, ImagePlus, FileText, Loader2 } from "lucide-react";
+import { RefreshCw, Palette, ImagePlus, FileText, Loader2 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { OnboardingEmptyState } from "@/components/profile/OnboardingEmptyState";
 import { StatoSection } from "@/components/profile/StatoSection";
