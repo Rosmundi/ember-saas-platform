@@ -196,7 +196,7 @@ export default function Dashboard() {
                     Lancia "Analizza profilo" per ottenere score, audit per sezione e riscritture pronte.
                   </p>
                 </div>
-                <Link to="/skill/auto-profile-setup">
+                <Link to="/profilo">
                   <Button size="sm" className="bg-primary hover:bg-primary-hover text-primary-foreground">
                     Analizza ora
                   </Button>
