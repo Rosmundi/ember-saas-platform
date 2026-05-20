@@ -38,26 +38,26 @@ export function ProfileHeaderCard({
           </div>
         )}
         {/* Foto profilo sovrapposta */}
-        <div className="absolute -bottom-8 left-5">
+        <div className="absolute -bottom-16 left-6">
           {profilePictureUrl ? (
             <img
               src={profilePictureUrl}
               alt="Foto profilo LinkedIn"
-              className="w-16 h-16 rounded-full border-4 border-card object-cover bg-card"
+              className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-card object-cover bg-card shadow-lg"
               loading="lazy"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
           ) : (
-            <div className="w-16 h-16 rounded-full border-4 border-card bg-muted flex items-center justify-center">
-              <span className="text-xl text-muted-foreground">?</span>
+            <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-card bg-muted flex items-center justify-center shadow-lg">
+              <span className="text-4xl text-muted-foreground">?</span>
             </div>
           )}
         </div>
       </div>
 
-      <CardContent className="p-6 pt-12 space-y-3">
+      <CardContent className="p-6 pt-20 space-y-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
             Come ti vede Ember adesso
