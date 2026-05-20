@@ -1,8 +1,8 @@
-// src/components/profile/StatoSection.tsx — v3.8.7
-// Score + sintesi + top 3 priorità + next actions.
+// src/components/profile/StatoSection.tsx — v3.8.9
+// Score radiale + sintesi + top 3 priorità + next actions.
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Target, ArrowRight } from "lucide-react";
+import { Target, ArrowRight, TrendingUp, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 
 function scoreColor(score: number): string {
@@ -12,14 +12,74 @@ function scoreColor(score: number): string {
   return "hsl(0 84% 60%)"; // red
 }
 
+function scoreLevel(score: number): string {
+  if (score >= 80) return "Eccellente";
+  if (score >= 60) return "Buono";
+  if (score >= 40) return "Intermedio";
+  return "Da migliorare";
+}
+
+function ScoreRing({ score, color }: { score: number; color: string }) {
+  const radius = 70;
+  const stroke = 10;
+  const normalizedRadius = radius - stroke / 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const offset = circumference - (score / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg height={radius * 2} width={radius * 2} className="-rotate-90">
+        <circle
+          stroke="hsl(var(--border))"
+          fill="transparent"
+          strokeWidth={stroke}
+          r={normalizedRadius}
+          cx={radius}
+          cy={radius}
+          opacity={0.3}
+        />
+        <circle
+          stroke={color}
+          fill="transparent"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${circumference} ${circumference}`}
+          style={{
+            strokeDashoffset: offset,
+            transition: "stroke-dashoffset 0.8s ease-out",
+            filter: `drop-shadow(0 0 8px ${color})`,
+          }}
+          r={normalizedRadius}
+          cx={radius}
+          cy={radius}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-4xl font-bold tabular-nums leading-none" style={{ color }}>
+          {score}
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">
+          / 100
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StatoSection({ audit }: { audit: any }) {
   if (!audit) {
     return (
-      <Card className="bg-card border-border/50">
-        <CardContent className="p-6">
-          <p className="text-sm text-muted-foreground italic">
-            Nessun audit ancora. Clicca "Aggiorna audit" in alto per iniziare.
-          </p>
+      <Card className="bg-card border-border/50 border-dashed">
+        <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Sparkles className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Nessun audit disponibile</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Clicca "Aggiorna audit" in alto per iniziare.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -30,43 +90,79 @@ export function StatoSection({ audit }: { audit: any }) {
   const priorita: string[] = audit.priorita_top_3 || audit.azioni_prioritarie || [];
   const nextActions: any[] = audit.next_actions || [];
   const sintesi: string = audit.sintesi || "";
-  const livello: string | undefined = audit.livello;
+  const livello: string = audit.livello || scoreLevel(score);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card className="bg-card border-border/50 md:col-span-1">
-        <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-          <div className="text-5xl font-bold tabular-nums" style={{ color }}>
-            {score}
+      {/* SCORE CARD */}
+      <Card
+        className="relative overflow-hidden bg-card border-border/50 md:col-span-1"
+        style={{
+          backgroundImage: `radial-gradient(circle at top right, ${color}1a, transparent 60%)`,
+        }}
+      >
+        <CardContent className="p-6 flex flex-col items-center justify-between text-center gap-4 h-full">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            <TrendingUp className="h-3 w-3" />
+            Profile score
           </div>
-          <div className="text-sm text-muted-foreground mt-1">/ 100</div>
-          {livello && (
-            <div className="mt-3 text-sm font-semibold" style={{ color }}>
+
+          <ScoreRing score={score} color={color} />
+
+          <div className="space-y-1">
+            <div
+              className="text-sm font-bold px-3 py-1 rounded-full border"
+              style={{
+                color,
+                borderColor: `${color}40`,
+                backgroundColor: `${color}15`,
+              }}
+            >
               {livello}
             </div>
-          )}
+            <p className="text-[11px] text-muted-foreground">
+              {score >= 60 ? "Sei sopra la media" : "C'è margine di crescita"}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-primary/30 md:col-span-2">
-        <CardContent className="p-6 space-y-3">
-          {sintesi && <p className="text-sm leading-relaxed">{sintesi}</p>}
+      {/* PRIORITY CARD */}
+      <Card className="bg-card border-border/50 md:col-span-2 overflow-hidden">
+        <CardContent className="p-6 space-y-4 h-full flex flex-col">
+          {sintesi && (
+            <div className="flex gap-3">
+              <div className="w-1 self-stretch rounded-full bg-primary/60 shrink-0" />
+              <p className="text-sm leading-relaxed text-foreground/90 italic">
+                {sintesi}
+              </p>
+            </div>
+          )}
+
           {priorita.length > 0 && (
-            <div className="pt-2 border-t border-border/30">
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                <Target className="h-4 w-4 text-primary" />
+            <div className="space-y-2.5 flex-1">
+              <h3 className="text-xs font-semibold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                <Target className="h-3.5 w-3.5 text-primary" />
                 Le 3 cose da fare adesso
               </h3>
-              <ol className="space-y-1.5">
+              <ol className="space-y-2">
                 {priorita.slice(0, 3).map((p, i) => (
-                  <li key={i} className="text-sm flex gap-2">
-                    <span className="font-bold text-primary shrink-0">{i + 1}.</span>
-                    <span className="leading-relaxed">{p}</span>
+                  <li
+                    key={i}
+                    className="group flex gap-3 items-start p-3 rounded-lg bg-surface/40 border border-border/30 hover:border-primary/40 hover:bg-surface/60 transition-all"
+                  >
+                    <span
+                      className="shrink-0 w-6 h-6 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="text-sm leading-relaxed pt-0.5">{p}</span>
                   </li>
                 ))}
               </ol>
             </div>
           )}
+
           {nextActions.length > 0 && (
             <div className="pt-2 border-t border-border/30 flex flex-wrap gap-1.5">
               {nextActions.slice(0, 4).map((na: any, i: number) => (
@@ -75,7 +171,7 @@ export function StatoSection({ audit }: { audit: any }) {
                   size="sm"
                   variant="ghost"
                   asChild
-                  className="h-7 text-xs gap-1"
+                  className="h-7 text-xs gap-1 hover:bg-primary/10 hover:text-primary"
                 >
                   <Link to={na.deeplink || "#"}>
                     {na.azione || na.label || "Azione"}
