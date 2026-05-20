@@ -102,13 +102,16 @@ export default function Dashboard() {
     profile.plan === "trial" && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date();
 
   // Dati profilo dall'ultima analisi (persistent in profile.raw_profile_data)
+  // v3.8.9: audit ora salvato annidato in raw_profile_data.audit.
+  // Fallback alle chiavi root per retrocompat con cache pre-v3.8.8.
   const rawData = profile.raw_profile_data as Record<string, any> | null;
-  const hasAnalysis = !!rawData?.score_totale;
-  const scoreTotale: number = rawData?.score_totale || 0;
-  const livello: string = rawData?.livello || "—";
-  const sintesi: string = rawData?.sintesi || "";
-  const azioniPrioritarie: string[] = rawData?.azioni_prioritarie || [];
-  const sezioni: any[] = rawData?.sezioni || [];
+  const audit = (rawData?.audit as Record<string, any>) || rawData || {};
+  const hasAnalysis = !!(audit?.score_totale || audit?.score_complessivo);
+  const scoreTotale: number = audit?.score_totale || audit?.score_complessivo || 0;
+  const livello: string = audit?.livello || "—";
+  const sintesi: string = audit?.sintesi || "";
+  const azioniPrioritarie: string[] = audit?.azioni_prioritarie || audit?.priorita_top_3 || [];
+  const sezioni: any[] = audit?.sezioni || [];
 
   // Aree da migliorare: score < 70, ordinate ascendenti, top 3
   const areeDaMigliorare = sezioni
