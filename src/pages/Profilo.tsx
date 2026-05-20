@@ -103,7 +103,7 @@ export default function Profilo() {
               onClick={() => setAuditDialogOpen(true)}
               className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground"
             >
-              <Sparkles className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" />
               Aggiorna audit
             </Button>
           </div>
