@@ -20,8 +20,8 @@ function scoreLevel(score: number): string {
 }
 
 function ScoreRing({ score, color }: { score: number; color: string }) {
-  const radius = 70;
-  const stroke = 10;
+  const radius = 58;
+  const stroke = 8;
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const offset = circumference - (score / 100) * circumference;
@@ -47,7 +47,7 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
           style={{
             strokeDashoffset: offset,
             transition: "stroke-dashoffset 0.8s ease-out",
-            filter: `drop-shadow(0 0 8px ${color})`,
+            filter: `drop-shadow(0 0 6px ${color})`,
           }}
           r={normalizedRadius}
           cx={radius}
@@ -55,10 +55,10 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-4xl font-bold tabular-nums leading-none" style={{ color }}>
+        <div className="text-3xl font-bold tabular-nums leading-none" style={{ color }}>
           {score}
         </div>
-        <div className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">
+        <div className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wider">
           / 100
         </div>
       </div>
@@ -101,17 +101,16 @@ export function StatoSection({ audit }: { audit: any }) {
           backgroundImage: `radial-gradient(circle at top right, ${color}1a, transparent 60%)`,
         }}
       >
-        <CardContent className="p-6 flex flex-col items-center justify-between text-center gap-4 h-full">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-            <TrendingUp className="h-3 w-3" />
-            Profile score
-          </div>
-
+        <CardContent className="p-5 flex flex-row md:flex-col items-center gap-4 md:gap-3 h-full">
           <ScoreRing score={score} color={color} />
 
-          <div className="space-y-1">
+          <div className="flex flex-col items-start md:items-center gap-1.5 md:text-center">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              <TrendingUp className="h-3 w-3" />
+              Profile score
+            </div>
             <div
-              className="text-sm font-bold px-3 py-1 rounded-full border"
+              className="text-xs font-bold px-2.5 py-0.5 rounded-full border"
               style={{
                 color,
                 borderColor: `${color}40`,
@@ -120,7 +119,7 @@ export function StatoSection({ audit }: { audit: any }) {
             >
               {livello}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground leading-snug">
               {score >= 60 ? "Sei sopra la media" : "C'è margine di crescita"}
             </p>
           </div>
