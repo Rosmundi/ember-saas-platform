@@ -101,17 +101,16 @@ export function StatoSection({ audit }: { audit: any }) {
           backgroundImage: `radial-gradient(circle at top right, ${color}1a, transparent 60%)`,
         }}
       >
-        <CardContent className="p-6 flex flex-col items-center justify-between text-center gap-4 h-full">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-            <TrendingUp className="h-3 w-3" />
-            Profile score
-          </div>
-
+        <CardContent className="p-5 flex flex-row md:flex-col items-center gap-4 md:gap-3 h-full">
           <ScoreRing score={score} color={color} />
 
-          <div className="space-y-1">
+          <div className="flex flex-col items-start md:items-center gap-1.5 md:text-center">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              <TrendingUp className="h-3 w-3" />
+              Profile score
+            </div>
             <div
-              className="text-sm font-bold px-3 py-1 rounded-full border"
+              className="text-xs font-bold px-2.5 py-0.5 rounded-full border"
               style={{
                 color,
                 borderColor: `${color}40`,
@@ -120,7 +119,7 @@ export function StatoSection({ audit }: { audit: any }) {
             >
               {livello}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground leading-snug">
               {score >= 60 ? "Sei sopra la media" : "C'è margine di crescita"}
             </p>
           </div>
