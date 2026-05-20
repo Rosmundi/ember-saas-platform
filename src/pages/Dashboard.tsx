@@ -286,7 +286,7 @@ export default function Dashboard() {
                         </div>
                         <p className="text-[11px] text-muted-foreground">
                           Il testo attuale non è stato rilevato.{" "}
-                          <Link to="/skill/auto-profile-setup?force=1" className="text-primary hover:underline">
+                          <Link to="/profilo" className="text-primary hover:underline">
                             Rianalizza
                           </Link>{" "}
                           per abilitare il confronto prima/dopo.
