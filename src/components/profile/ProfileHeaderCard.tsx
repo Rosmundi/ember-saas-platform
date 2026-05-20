@@ -18,9 +18,9 @@ export function ProfileHeaderCard({
   coverPictureUrl,
 }: ProfileHeaderCardProps) {
   return (
-    <Card className="border-border/50 overflow-hidden">
+    <Card className="border-border/50 overflow-visible">
       {/* Banner */}
-      <div className="relative h-32 sm:h-40 bg-muted/30 overflow-hidden">
+      <div className="relative h-32 sm:h-40 bg-muted/30 rounded-t-lg overflow-hidden">
         {coverPictureUrl ? (
           <img
             src={coverPictureUrl}
