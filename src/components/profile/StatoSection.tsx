@@ -20,8 +20,8 @@ function scoreLevel(score: number): string {
 }
 
 function ScoreRing({ score, color }: { score: number; color: string }) {
-  const radius = 70;
-  const stroke = 10;
+  const radius = 58;
+  const stroke = 8;
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const offset = circumference - (score / 100) * circumference;
@@ -47,7 +47,7 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
           style={{
             strokeDashoffset: offset,
             transition: "stroke-dashoffset 0.8s ease-out",
-            filter: `drop-shadow(0 0 8px ${color})`,
+            filter: `drop-shadow(0 0 6px ${color})`,
           }}
           r={normalizedRadius}
           cx={radius}
@@ -55,10 +55,10 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-4xl font-bold tabular-nums leading-none" style={{ color }}>
+        <div className="text-3xl font-bold tabular-nums leading-none" style={{ color }}>
           {score}
         </div>
-        <div className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">
+        <div className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wider">
           / 100
         </div>
       </div>
