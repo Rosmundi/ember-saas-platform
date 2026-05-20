@@ -252,7 +252,7 @@ export default function Dashboard() {
                         Headline — prima / dopo
                       </p>
                       <Link
-                        to="/skill/auto-profile-setup?section=Headline"
+                        to="/profilo#audit"
                         className="text-[11px] text-primary hover:text-primary-hover flex items-center gap-1"
                       >
                         Modifica in dettaglio <ChevronRight className="h-3 w-3" />
@@ -261,7 +261,7 @@ export default function Dashboard() {
                     {headlineSection.stato_attuale ? (
                       <div className="grid sm:grid-cols-2 gap-3">
                         <Link
-                          to="/skill/auto-profile-setup?section=Headline"
+                          to="/profilo#audit"
                           className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
                         >
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
