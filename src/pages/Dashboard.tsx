@@ -165,11 +165,7 @@ export default function Dashboard() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Link
-                  to={`/skill/auto-profile-setup?force=1${
-                    profile.linkedin_url ? `&url=${encodeURIComponent(profile.linkedin_url)}` : ""
-                  }`}
-                >
+                <Link to="/profilo">
                   <Button
                     size="sm"
                     variant="outline"
@@ -180,7 +176,7 @@ export default function Dashboard() {
                   </Button>
                 </Link>
                 {hasAnalysis && (
-                  <Link to="/skill/auto-profile-setup">
+                  <Link to="/profilo">
                     <Button size="sm" className="bg-primary hover:bg-primary-hover text-primary-foreground">
                       Vedi analisi completa
                       <ArrowRight className="h-3 w-3 ml-1.5" />
