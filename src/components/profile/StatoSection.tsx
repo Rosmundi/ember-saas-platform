@@ -22,20 +22,23 @@ function scoreLevel(score: number): string {
 function ScoreRing({ score, color }: { score: number; color: string }) {
   const radius = 58;
   const stroke = 8;
+  const padding = 14; // spazio extra per non tagliare il glow
+  const size = radius * 2 + padding * 2;
+  const center = radius + padding;
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg height={radius * 2} width={radius * 2} className="-rotate-90">
+    <div className="relative inline-flex items-center justify-center shrink-0">
+      <svg height={size} width={size} className="-rotate-90 overflow-visible">
         <circle
           stroke="hsl(var(--border))"
           fill="transparent"
           strokeWidth={stroke}
           r={normalizedRadius}
-          cx={radius}
-          cy={radius}
+          cx={center}
+          cy={center}
           opacity={0.3}
         />
         <circle
@@ -50,11 +53,11 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
             filter: `drop-shadow(0 0 6px ${color})`,
           }}
           r={normalizedRadius}
-          cx={radius}
-          cy={radius}
+          cx={center}
+          cy={center}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <div className="text-3xl font-bold tabular-nums leading-none" style={{ color }}>
           {score}
         </div>
