@@ -1,22 +1,70 @@
-// src/components/profile/ProfileHeaderCard.tsx — v3.8.7
-// Header LinkedIn-like read-only del business_profile. Sostituisce ChiSeiSection (form).
+// src/components/profile/ProfileHeaderCard.tsx — v3.8.9
+// Header LinkedIn-like con banner + foto profilo reali (pass-through da audit).
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ImageOff } from "lucide-react";
 import type { BusinessProfile } from "@/lib/ember-types";
 
-export function ProfileHeaderCard({ businessProfile }: { businessProfile: BusinessProfile }) {
+interface ProfileHeaderCardProps {
+  businessProfile: BusinessProfile;
+  // v3.8.9: URL pass-through da auto-profile-setup
+  profilePictureUrl?: string | null;
+  coverPictureUrl?: string | null;
+}
+
+export function ProfileHeaderCard({
+  businessProfile,
+  profilePictureUrl,
+  coverPictureUrl,
+}: ProfileHeaderCardProps) {
   return (
-    <Card className="bg-card border-border/50 overflow-hidden">
-      <CardContent className="p-6 space-y-3">
+    <Card className="border-border/50 overflow-hidden">
+      {/* Banner */}
+      <div className="relative h-32 sm:h-40 bg-muted/30 overflow-hidden">
+        {coverPictureUrl ? (
+          <img
+            src={coverPictureUrl}
+            alt="Banner LinkedIn"
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            <ImageOff className="h-6 w-6" />
+            <span className="ml-2 text-xs">Nessun banner</span>
+          </div>
+        )}
+        {/* Foto profilo sovrapposta */}
+        <div className="absolute -bottom-8 left-5">
+          {profilePictureUrl ? (
+            <img
+              src={profilePictureUrl}
+              alt="Foto profilo LinkedIn"
+              className="w-16 h-16 rounded-full border-4 border-card object-cover bg-card"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full border-4 border-card bg-muted flex items-center justify-center">
+              <span className="text-xl text-muted-foreground">?</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <CardContent className="p-6 pt-12 space-y-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
             Come ti vede Ember adesso
           </p>
           <h2 className="text-xl font-bold leading-tight">{businessProfile.nome}</h2>
         </div>
-        {businessProfile.headline && (
-          <p className="text-base leading-relaxed">{businessProfile.headline}</p>
-        )}
+        <p className="text-base leading-relaxed">{businessProfile.headline}</p>
         {businessProfile.settore && (
           <p className="text-sm text-muted-foreground">{businessProfile.settore}</p>
         )}
@@ -28,7 +76,7 @@ export function ProfileHeaderCard({ businessProfile }: { businessProfile: Busine
             <p className="text-sm leading-relaxed">{businessProfile.value_proposition}</p>
           </div>
         )}
-        {businessProfile.tags?.length > 0 && (
+        {businessProfile.tags && businessProfile.tags.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap pt-2">
             {businessProfile.tags.map((tag) => (
               <Badge key={tag} variant="secondary" className="text-xs">

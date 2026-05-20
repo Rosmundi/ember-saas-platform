@@ -102,13 +102,16 @@ export default function Dashboard() {
     profile.plan === "trial" && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date();
 
   // Dati profilo dall'ultima analisi (persistent in profile.raw_profile_data)
+  // v3.8.9: audit ora salvato annidato in raw_profile_data.audit.
+  // Fallback alle chiavi root per retrocompat con cache pre-v3.8.8.
   const rawData = profile.raw_profile_data as Record<string, any> | null;
-  const hasAnalysis = !!rawData?.score_totale;
-  const scoreTotale: number = rawData?.score_totale || 0;
-  const livello: string = rawData?.livello || "—";
-  const sintesi: string = rawData?.sintesi || "";
-  const azioniPrioritarie: string[] = rawData?.azioni_prioritarie || [];
-  const sezioni: any[] = rawData?.sezioni || [];
+  const audit = (rawData?.audit as Record<string, any>) || rawData || {};
+  const hasAnalysis = !!(audit?.score_totale || audit?.score_complessivo);
+  const scoreTotale: number = audit?.score_totale || audit?.score_complessivo || 0;
+  const livello: string = audit?.livello || "—";
+  const sintesi: string = audit?.sintesi || "";
+  const azioniPrioritarie: string[] = audit?.azioni_prioritarie || audit?.priorita_top_3 || [];
+  const sezioni: any[] = audit?.sezioni || [];
 
   // Aree da migliorare: score < 70, ordinate ascendenti, top 3
   const areeDaMigliorare = sezioni
@@ -162,11 +165,7 @@ export default function Dashboard() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Link
-                  to={`/skill/auto-profile-setup?force=1${
-                    profile.linkedin_url ? `&url=${encodeURIComponent(profile.linkedin_url)}` : ""
-                  }`}
-                >
+                <Link to="/profilo">
                   <Button
                     size="sm"
                     variant="outline"
@@ -177,7 +176,7 @@ export default function Dashboard() {
                   </Button>
                 </Link>
                 {hasAnalysis && (
-                  <Link to="/skill/auto-profile-setup">
+                  <Link to="/profilo">
                     <Button size="sm" className="bg-primary hover:bg-primary-hover text-primary-foreground">
                       Vedi analisi completa
                       <ArrowRight className="h-3 w-3 ml-1.5" />
@@ -197,7 +196,7 @@ export default function Dashboard() {
                     Lancia "Analizza profilo" per ottenere score, audit per sezione e riscritture pronte.
                   </p>
                 </div>
-                <Link to="/skill/auto-profile-setup">
+                <Link to="/profilo">
                   <Button size="sm" className="bg-primary hover:bg-primary-hover text-primary-foreground">
                     Analizza ora
                   </Button>
@@ -253,7 +252,7 @@ export default function Dashboard() {
                         Headline — prima / dopo
                       </p>
                       <Link
-                        to="/skill/auto-profile-setup?section=Headline"
+                        to="/profilo#audit"
                         className="text-[11px] text-primary hover:text-primary-hover flex items-center gap-1"
                       >
                         Modifica in dettaglio <ChevronRight className="h-3 w-3" />
@@ -262,7 +261,7 @@ export default function Dashboard() {
                     {headlineSection.stato_attuale ? (
                       <div className="grid sm:grid-cols-2 gap-3">
                         <Link
-                          to="/skill/auto-profile-setup?section=Headline"
+                          to="/profilo#audit"
                           className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
                         >
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
@@ -287,7 +286,7 @@ export default function Dashboard() {
                         </div>
                         <p className="text-[11px] text-muted-foreground">
                           Il testo attuale non è stato rilevato.{" "}
-                          <Link to="/skill/auto-profile-setup?force=1" className="text-primary hover:underline">
+                          <Link to="/profilo" className="text-primary hover:underline">
                             Rianalizza
                           </Link>{" "}
                           per abilitare il confronto prima/dopo.
@@ -305,7 +304,7 @@ export default function Dashboard() {
                         About — prima / dopo
                       </p>
                       <Link
-                        to="/skill/auto-profile-setup?section=About"
+                        to="/profilo#audit"
                         className="text-[11px] text-primary hover:text-primary-hover flex items-center gap-1"
                       >
                         Modifica in dettaglio <ChevronRight className="h-3 w-3" />
@@ -314,7 +313,7 @@ export default function Dashboard() {
                     {aboutSection.stato_attuale ? (
                       <div className="grid sm:grid-cols-2 gap-3">
                         <Link
-                          to="/skill/auto-profile-setup?section=About"
+                          to="/profilo#audit"
                           className="block p-4 rounded-xl bg-surface/40 border border-border/30 hover:border-border/60 transition-colors"
                         >
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Prima</p>
@@ -345,7 +344,7 @@ export default function Dashboard() {
                         </div>
                         <p className="text-[11px] text-muted-foreground">
                           Il testo attuale non è stato rilevato.{" "}
-                          <Link to="/skill/auto-profile-setup?force=1" className="text-primary hover:underline">
+                          <Link to="/profilo" className="text-primary hover:underline">
                             Rianalizza
                           </Link>{" "}
                           per abilitare il confronto prima/dopo.
@@ -365,7 +364,7 @@ export default function Dashboard() {
                       {areeDaMigliorare.map((s) => (
                         <Link
                           key={s.nome}
-                          to={`/skill/auto-profile-setup?section=${encodeURIComponent(s.nome)}`}
+                          to="/profilo#audit"
                           className="block"
                         >
                           <div
