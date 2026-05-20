@@ -18,7 +18,7 @@ export function ProfileHeaderCard({
   coverPictureUrl,
 }: ProfileHeaderCardProps) {
   return (
-    <Card className="border-border/50 overflow-visible">
+    <Card className="border-border/50 overflow-visible relative">
       {/* Banner */}
       <div className="relative h-32 sm:h-40 bg-muted/30 rounded-t-lg overflow-hidden">
         {coverPictureUrl ? (
@@ -37,27 +37,29 @@ export function ProfileHeaderCard({
             <span className="ml-2 text-xs">Nessun banner</span>
           </div>
         )}
-        {/* Foto profilo sovrapposta */}
-        <div className="absolute -bottom-16 left-6">
-          {profilePictureUrl ? (
-            <img
-              src={profilePictureUrl}
-              alt="Foto profilo LinkedIn"
-              className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-card object-cover bg-card shadow-lg"
-              loading="lazy"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-card bg-muted flex items-center justify-center shadow-lg">
-              <span className="text-4xl text-muted-foreground">?</span>
-            </div>
-          )}
-        </div>
+      </div>
+
+      {/* Foto profilo sovrapposta — fuori dal banner per non essere clippata */}
+      <div className="absolute left-6 top-32 sm:top-40 -translate-y-1/2 z-10">
+        {profilePictureUrl ? (
+          <img
+            src={profilePictureUrl}
+            alt="Foto profilo LinkedIn"
+            className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-card object-cover bg-card shadow-xl"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-card bg-muted flex items-center justify-center shadow-xl">
+            <span className="text-4xl text-muted-foreground">?</span>
+          </div>
+        )}
       </div>
 
       <CardContent className="p-6 pt-20 space-y-3">
+
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
             Come ti vede Ember adesso
