@@ -1,73 +1,90 @@
-// src/components/profile/dialogs/UpdateAuditDialog.tsx — v3.8.7
-// Usa useProfileAudit. Permette feedback opzionale → re-audit completo con
-// rigenerazione di business_profile se il flag arriva dal n8n.
-import { useState, useEffect } from "react";
+// src/components/profile/dialogs/UpdateAuditDialog.tsx — v3.8.8
+import { useState } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { useProfileAudit } from "@/hooks/useProfileAudit";
 
-export function UpdateAuditDialog({
-  open, onOpenChange,
-}: { open: boolean; onOpenChange: (b: boolean) => void }) {
-  const { runQuickAudit, running } = useProfileAudit();
+interface UpdateAuditDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function UpdateAuditDialog({ open, onOpenChange }: UpdateAuditDialogProps) {
   const [feedback, setFeedback] = useState("");
+  const { runAudit, running } = useProfileAudit();
 
-  useEffect(() => {
-    if (!open) setFeedback("");
-  }, [open]);
-
-  const handleRun = async () => {
-    const trimmed = feedback.trim();
-    const res = await runQuickAudit({ feedback_utente: trimmed || undefined });
-    if (res) onOpenChange(false);
+  const onSubmit = async () => {
+    const res = await runAudit({ feedback_utente: feedback.trim() || undefined });
+    if (res) {
+      setFeedback("");
+      onOpenChange(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Aggiorna audit</DialogTitle>
+          <DialogTitle>Aggiorna l'audit del profilo</DialogTitle>
           <DialogDescription>
-            Ricalcola score e riscritture. ~15s. Costa 1 skill-run.
+            Ember riscarica il tuo profilo LinkedIn da Apify e rigenera l'audit completo.
+            Lo stato attuale del profilo resta sempre fedele a LinkedIn — il feedback
+            influenza solo le riscritture proposte.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="audit-feedback" className="text-xs">
-            Cosa vuoi cambiare? (opzionale)
+
+        <div className="space-y-2 py-2">
+          <Label htmlFor="audit-feedback">
+            Cosa vuoi cambiare? <span className="text-muted-foreground">(opzionale)</span>
           </Label>
           <Textarea
             id="audit-feedback"
-            rows={3}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Es. 'Ha esagerato col CRM, vorrei un posizionamento più ampio da consulente commerciale.'"
-            className="bg-surface border-border/50 resize-none"
+            placeholder="Es: 'Ha esagerato col CRM, vorrei meno monodirezionale. Sono un consulente sviluppo commerciale che usa CRM come strumento, non come identità.'"
+            rows={5}
+            className="resize-none"
+            disabled={running}
           />
-          <p className="text-[11px] text-muted-foreground">
-            Se compilato, l'audit viene rifatto da zero secondo le tue indicazioni
-            (headline, about, priorità, business profile).
+          <p className="text-xs text-muted-foreground">
+            Se lasci vuoto, Ember rifà l'audit così com'è. Se scrivi un feedback,
+            riscrive Headline, About e posizionamento nella direzione che indichi.
           </p>
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>
+
+        <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 p-3">
+          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-200 leading-relaxed">
+            Consuma <strong>1 scrape Apify</strong> + 1 skill-run.
+            Lo scrape garantisce che l'audit lavori su dati LinkedIn freschi, non su cache interne.
+          </p>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={running}
+          >
             Annulla
           </Button>
-          <Button
-            onClick={handleRun}
-            disabled={running}
-            className="bg-primary hover:bg-primary-hover text-primary-foreground"
-          >
+          <Button onClick={onSubmit} disabled={running} className="gap-2">
             {running ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-4 w-4" />
             )}
-            Lancia audit
+            Aggiorna audit
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -10,7 +10,6 @@
 
 export type SkillId =
   | "auto-profile-setup"
-  | "profile-optimizer"
   | "post-writer"
   | "post-improver"
   | "hook-generator"
@@ -238,7 +237,7 @@ export function canUseSkill(
 }
 
 export const PLAN_LIMITS: Record<PlanType, { skillRuns: number; scraping: number; watchlist: number }> = {
-  trial: { skillRuns: 20, scraping: 0, watchlist: 0 },
+  trial: { skillRuns: 20, scraping: 1, watchlist: 0 },
   base: { skillRuns: 60, scraping: 1, watchlist: 0 },
   pro: { skillRuns: 250, scraping: 5, watchlist: 15 },
   studio: { skillRuns: 1000, scraping: 20, watchlist: 50 },
