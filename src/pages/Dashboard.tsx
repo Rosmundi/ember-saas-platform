@@ -364,7 +364,7 @@ export default function Dashboard() {
                       {areeDaMigliorare.map((s) => (
                         <Link
                           key={s.nome}
-                          to={`/skill/auto-profile-setup?section=${encodeURIComponent(s.nome)}`}
+                          to="/profilo#audit"
                           className="block"
                         >
                           <div
