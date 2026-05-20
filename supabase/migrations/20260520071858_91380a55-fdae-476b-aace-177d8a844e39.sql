@@ -1,0 +1,1 @@
+UPDATE profiles SET scrapes_daily_limit = 1 WHERE plan = 'trial' AND scrapes_daily_limit = 0;
