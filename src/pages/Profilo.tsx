@@ -114,7 +114,11 @@ export default function Profilo() {
 
         {/* SEZIONE 2: AUDIT (header LinkedIn-like + 7 card sezione) */}
         <div className="space-y-4">
-          <ProfileHeaderCard businessProfile={profile.business_profile} />
+          <ProfileHeaderCard
+            businessProfile={profile.business_profile}
+            profilePictureUrl={audit?.profile_picture_url ?? null}
+            coverPictureUrl={audit?.cover_picture_url ?? null}
+          />
           <AuditSection sezioni={audit?.sezioni || []} />
         </div>
 
