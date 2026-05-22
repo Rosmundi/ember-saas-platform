@@ -45,11 +45,7 @@ const App = () => (
                 <SkillPage />
               </ProtectedRoute>
             } />
-            <Route path="/history" element={
-              <ProtectedRoute>
-                <History />
-              </ProtectedRoute>
-            } />
+            <Route path="/history" element={<Navigate to="/dashboard" replace />} />
             <Route path="/watchlist" element={
               <ProtectedRoute>
                 <Watchlist />
