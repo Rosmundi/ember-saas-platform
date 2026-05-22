@@ -95,9 +95,19 @@ function getPreview(asset: ContentAssetRow): string {
 
 export default function Content() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get("type") as any) || "all";
+  const hashTab = location.hash ? location.hash.slice(1) : "";
+  const validTabs = ["all", "post", "hook", "improvement", "visual_brief", "carousel_brief"];
+  const initialTab = (validTabs.includes(hashTab) ? hashTab : (searchParams.get("type") as any) || "all") as "all" | ContentAssetType;
   const [tab, setTab] = useState<"all" | ContentAssetType>(initialTab);
+
+  // Sync hash → tab
+  useEffect(() => {
+    const h = location.hash.slice(1);
+    if (validTabs.includes(h) && h !== tab) setTab(h as any);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.hash]);
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ContentAssetRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
