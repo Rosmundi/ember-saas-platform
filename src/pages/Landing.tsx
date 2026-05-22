@@ -43,12 +43,14 @@ const pricing = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden cosmic-bg">
       {/* Nav */}
-      <nav className="fixed top-0 w-full z-50 bg-background/70 backdrop-blur-lg border-b border-border/50">
+      <nav className="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <span className="text-primary font-bold text-2xl tracking-tight flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
+            <span className="inline-flex w-8 h-8 rounded-lg bg-primary/15 items-center justify-center text-primary font-extrabold text-sm shadow-[0_0_20px_hsl(var(--primary)/0.5)]">
+              E
+            </span>
             EMBER
           </span>
           <Link to="/login">
@@ -58,35 +60,33 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-32 pb-24 px-6 overflow-hidden">
-        {/* Background layers */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-card/30" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(38_92%_44%/0.15),transparent)]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,hsl(38_92%_44%/0.08),transparent_60%)] blur-3xl pointer-events-none" />
-        {/* Grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(hsl(215_25%_27%/0.15)_1px,transparent_1px),linear-gradient(90deg,hsl(215_25%_27%/0.15)_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_40%,black,transparent)]" />
+      <section className="relative pt-36 pb-32 px-6 overflow-hidden">
+        {/* Neon arcs cosmiche */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1400, height: 1400, top: -200, left: -700 }} />
+          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1600, height: 1600, top: -300, right: -800, animationDelay: '2.5s' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-[radial-gradient(circle,hsl(var(--primary)/0.10),transparent_60%)] blur-3xl" />
+        </div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <ScrollReveal>
-            <Badge className="mb-6 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15 transition-colors px-4 py-1.5 text-sm font-medium">
-              🚀 14 giorni di trial gratuito
+            <Badge className="mb-8 bg-primary/10 text-primary border-primary/30 hover:bg-primary/15 transition-colors px-4 py-1.5 text-xs font-medium tracking-widest uppercase shadow-[0_0_24px_hsl(var(--primary)/0.25)]">
+              <Sparkles className="h-3 w-3 mr-1.5" /> Linkedin copilot · 14 giorni gratis
             </Badge>
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] mb-6 bg-gradient-to-b from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
-              Trasforma LinkedIn nel tuo canale di crescita.
-              <span className="block text-3xl md:text-4xl lg:text-5xl font-bold mt-4 text-muted-foreground">
-                Ember è il copilot dei professionisti che non hanno tempo da perdere.
-              </span>
+            <h1 className="text-5xl md:text-7xl lg:text-[88px] font-extrabold leading-[1.02] mb-8 tracking-tight">
+              <span className="text-gradient-primary">Trasforma LinkedIn</span>
+              <span className="block text-gradient-ember text-glow-primary mt-2">nel tuo canale</span>
+              <span className="block text-gradient-primary">di crescita.</span>
             </h1>
           </ScrollReveal>
 
           <ScrollReveal delay={200}>
-            <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-              Genera post, trova prospect, scrivi outreach personalizzato.
-              <br className="hidden sm:block" />
-              Tutto in italiano, senza rischiare il ban.
+            <p className="text-lg md:text-xl text-muted-foreground/90 mb-12 max-w-2xl mx-auto leading-relaxed">
+              Ember è il copilot dei professionisti che non hanno tempo da perdere.
+              Genera post, trova prospect, scrivi outreach personalizzato — tutto in italiano, senza rischiare il ban.
             </p>
           </ScrollReveal>
 
@@ -94,9 +94,10 @@ export default function Landing() {
             <Link to="/login">
               <Button
                 size="lg"
-                className="text-lg px-10 py-7 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl font-semibold shadow-[0_0_40px_hsl(38_92%_44%/0.3)] hover:shadow-[0_0_60px_hsl(38_92%_44%/0.4)] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                className="text-base px-10 py-7 bg-primary hover:bg-primary-hover text-primary-foreground rounded-full font-semibold btn-glow transition-all duration-300 hover:scale-[1.03] active:scale-[0.98]"
               >
                 Inizia gratis — 14 giorni di trial
+                <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
             <p className="mt-5 text-sm text-muted-foreground/70">
