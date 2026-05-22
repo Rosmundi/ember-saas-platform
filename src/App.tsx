@@ -61,16 +61,13 @@ const App = () => (
                 <Settings />
               </ProtectedRoute>
             } />
-            <Route path="/icps" element={
+            <Route path="/prospect" element={
               <ProtectedRoute>
-                <Icps />
+                <Prospect />
               </ProtectedRoute>
             } />
-            <Route path="/searches" element={
-              <ProtectedRoute>
-                <Searches />
-              </ProtectedRoute>
-            } />
+            <Route path="/icps" element={<Navigate to="/prospect?tab=target" replace />} />
+            <Route path="/searches" element={<Navigate to="/prospect?tab=storico" replace />} />
             <Route path="/brand" element={<Navigate to="/profilo#brand-voice" replace />} />
             <Route path="/content" element={
               <ProtectedRoute>
