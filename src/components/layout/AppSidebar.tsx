@@ -8,6 +8,7 @@ import {
   LayoutDashboard, Clock, Radar, Settings, Sparkles, UserCheck,
   ChevronDown, Target, Search, History as HistoryIcon,
   Activity, User as UserIcon, Palette, ListChecks, ImageIcon, FileText,
+  PenTool, Zap, Wand2, Layers,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -25,12 +26,6 @@ const mainNav = [
   { title: "Impostazioni", url: "/settings", icon: Settings },
 ];
 
-const prospectSubNav = [
-  { title: "Target (ICP)", hash: "#target", icon: Target },
-  { title: "Cerca prospect", hash: "#cerca", icon: Search },
-  { title: "Ricerche", hash: "#ricerche", icon: HistoryIcon },
-];
-
 const profiloSubNav = [
   { title: "Stato", hash: "#stato", icon: Activity },
   { title: "Chi sei", hash: "#chi-sei", icon: UserIcon },
@@ -38,6 +33,21 @@ const profiloSubNav = [
   { title: "Audit sezioni", hash: "#audit", icon: ListChecks },
   { title: "Banner", hash: "#banner", icon: ImageIcon },
   { title: "Dati LinkedIn", hash: "#dati-linkedin", icon: FileText },
+];
+
+const prospectSubNav = [
+  { title: "Target (ICP)", hash: "#target", icon: Target },
+  { title: "Cerca prospect", hash: "#cerca", icon: Search },
+  { title: "Ricerche", hash: "#ricerche", icon: HistoryIcon },
+];
+
+const contentSubNav = [
+  { title: "Tutti", hash: "#all", icon: Sparkles },
+  { title: "Post", hash: "#post", icon: PenTool },
+  { title: "Hook", hash: "#hook", icon: Zap },
+  { title: "Migliorati", hash: "#improvement", icon: Wand2 },
+  { title: "Visual", hash: "#visual_brief", icon: ImageIcon },
+  { title: "Carousel", hash: "#carousel_brief", icon: Layers },
 ];
 
 function NestedGroup({
@@ -176,6 +186,22 @@ export function AppSidebar() {
               </SidebarMenuItem>
 
               <NestedGroup
+                basePath="/profilo"
+                title="Il mio profilo"
+                icon={UserCheck}
+                subNav={profiloSubNav}
+                collapsed={collapsed}
+              />
+
+              <NestedGroup
+                basePath="/content"
+                title="I miei contenuti"
+                icon={Sparkles}
+                subNav={contentSubNav}
+                collapsed={collapsed}
+              />
+
+              <NestedGroup
                 basePath="/prospect"
                 title="Prospect"
                 icon={Radar}
@@ -214,29 +240,6 @@ export function AppSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu>
-                {layer.label === "PROFILO" && (
-                  <NestedGroup
-                    basePath="/profilo"
-                    title="Il mio profilo"
-                    icon={UserCheck}
-                    subNav={profiloSubNav}
-                    collapsed={collapsed}
-                  />
-                )}
-                {layer.label === "CONTENT" && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to="/content"
-                        className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
-                        activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
-                      >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>I miei contenuti</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
                 {layer.skills.map((skill) => {
                   const available = skill.plans.includes(plan);
                   return (
