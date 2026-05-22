@@ -2,7 +2,7 @@
 // 2 sezioni vere (Stato + Audit). Tutto il resto è chrome: header, brand widget,
 // footer azioni, modal raw LinkedIn.
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
