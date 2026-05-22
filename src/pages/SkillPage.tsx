@@ -84,6 +84,32 @@ const REGIONI_IT: Array<{ value: string; label: string }> = [
   { value: "Aosta Valley, Italy",            label: "Valle d'Aosta" },
 ];
 
+// v3.8.11 fix: i value contengono virgole (es. "Lombardy, Italy"), quindi NON
+// possiamo serializzare la multi-selezione come CSV. Usiamo "|" come separatore.
+// Per retro-compatibilità, il parser accetta anche valori legacy senza separatore.
+const ZONE_SEP = "|";
+const parseZones = (raw: string | undefined | null): string[] => {
+  const s = (raw || "Italy").trim();
+  if (!s) return ["Italy"];
+  // Nuovo formato: pipe-separated
+  if (s.includes(ZONE_SEP)) return s.split(ZONE_SEP).map((z) => z.trim()).filter(Boolean);
+  // Legacy: se il valore matcha esattamente uno dei value noti, è singolo
+  if (REGIONI_IT.some((r) => r.value === s)) return [s];
+  // Legacy CSV: prova a ricostruire i value validi
+  const parts = s.split(",").map((p) => p.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const two = i + 1 < parts.length ? `${parts[i]}, ${parts[i + 1]}` : null;
+    if (two && REGIONI_IT.some((r) => r.value === two)) {
+      out.push(two);
+      i++;
+    } else if (REGIONI_IT.some((r) => r.value === parts[i])) {
+      out.push(parts[i]);
+    }
+  }
+  return out.length > 0 ? out : ["Italy"];
+};
+
 // ============ UTILITY COMPONENTS ============
 
 function CopyButton({ text }: { text: string }) {
