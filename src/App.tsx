@@ -10,7 +10,6 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import SkillPage from "./pages/SkillPage";
-import History from "./pages/History";
 import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
 import Profilo from "./pages/Profilo";
@@ -46,11 +45,7 @@ const App = () => (
                 <SkillPage />
               </ProtectedRoute>
             } />
-            <Route path="/history" element={
-              <ProtectedRoute>
-                <History />
-              </ProtectedRoute>
-            } />
+            <Route path="/history" element={<Navigate to="/dashboard" replace />} />
             <Route path="/watchlist" element={
               <ProtectedRoute>
                 <Watchlist />
