@@ -1,24 +1,32 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SkillIcon } from "@/components/SkillIcon";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { SKILLS } from "@/lib/ember-types";
 import {
   Link as LinkIcon, Zap, PenTool, Copy,
-  CheckCircle, ChevronRight, Sparkles,
+  CheckCircle, ChevronRight, Sparkles, Target, UserCheck,
 } from "lucide-react";
 
+// Le skill del layer "profilo" sono assorbite dalla pagina /profilo (non hanno card in SKILLS).
+// Per la landing pubblica le rappresentiamo staticamente.
+const profiloSkills = [
+  { id: "auto-setup", name: "Auto Profile Setup", icon: "UserCheck", description: "Genera un profilo LinkedIn ottimizzato partendo dal tuo URL pubblico." },
+  { id: "optimizer", name: "Profile Optimizer", icon: "Award", description: "Audit headline, about, esperienze con raccomandazioni concrete." },
+  { id: "brand-voice", name: "Brand Voice", icon: "Sparkles", description: "Definisci tone of voice, temi, do & don't del tuo personal brand." },
+  { id: "banner-brief", name: "Brief banner LinkedIn", icon: "Flag", description: "Brief grafico pronto da girare al designer o a un generatore AI." },
+];
+
 const layers = [
-  { title: "Profilo", icon: "UserCheck", color: "from-blue-500/20 to-blue-600/5", border: "hover:border-blue-500/50", skills: SKILLS.filter(s => s.layer === 'profilo') },
-  { title: "Content", icon: "PenTool", color: "from-amber-500/20 to-amber-600/5", border: "hover:border-amber-500/50", skills: SKILLS.filter(s => s.layer === 'content') },
-  { title: "Prospect", icon: "Target", color: "from-emerald-500/20 to-emerald-600/5", border: "hover:border-emerald-500/50", skills: SKILLS.filter(s => s.layer === 'prospect') },
+  { title: "Profilo", icon: "UserCheck", skills: profiloSkills },
+  { title: "Content", icon: "PenTool", skills: SKILLS.filter(s => s.layer === 'content') },
+  { title: "Prospect", icon: "Target", skills: SKILLS.filter(s => s.layer === 'prospect') },
 ];
 
 const steps = [
   { icon: LinkIcon, title: "Incolla il tuo LinkedIn URL", desc: "Basta il link del tuo profilo pubblico." },
-  { icon: Zap, title: "Ember analizza il tuo profilo e il tuo mercato", desc: "AI e scraping intelligente fanno il lavoro pesante." },
+  { icon: Zap, title: "Ember analizza profilo e mercato", desc: "AI e scraping intelligente fanno il lavoro pesante." },
   { icon: PenTool, title: "Scegli una skill e compila il brief", desc: "10 skill per ogni fase del tuo funnel." },
   { icon: Copy, title: "Copia il risultato e pubblica", desc: "Contenuti pronti, outreach calibrato, zero rischi." },
 ];
@@ -61,7 +69,6 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="relative pt-36 pb-32 px-6 overflow-hidden">
-        {/* Neon arcs cosmiche */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1400, height: 1400, top: -200, left: -700 }} />
           <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1600, height: 1600, top: -300, right: -800, animationDelay: '2.5s' }} />
@@ -108,16 +115,21 @@ export default function Landing() {
       </section>
 
       {/* 3 Layer, 10 Skill */}
-      <section className="py-24 px-6 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-card/30 via-transparent to-card/20" />
+      <section className="py-28 px-6 relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1200, height: 1200, top: -400, left: -600, animationDelay: '1s' }} />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_50%,hsl(var(--primary)/0.06),transparent_70%)]" />
+        </div>
+
         <div className="max-w-6xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
-              <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 px-3 py-1 text-xs">
+              <Badge className="mb-4 bg-primary/10 text-primary border-primary/30 px-3 py-1 text-xs tracking-widest uppercase">
                 3 Layer · 10 Skill
               </Badge>
-              <h2 className="text-3xl md:text-4xl font-bold">
-                Tutto quello che serve per crescere su LinkedIn
+              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                <span className="text-gradient-primary">Tutto quello che serve per </span>
+                <span className="text-gradient-ember">crescere su LinkedIn</span>
               </h2>
             </div>
           </ScrollReveal>
@@ -127,28 +139,26 @@ export default function Landing() {
               <ScrollReveal key={layer.title} delay={layerIdx * 150} direction="up">
                 <div>
                   <div className="flex items-center gap-2.5 mb-5">
-                    <div className={`p-2 rounded-lg bg-gradient-to-br ${layer.color}`}>
+                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shadow-[0_0_20px_hsl(var(--primary)/0.2)]">
                       <SkillIcon name={layer.icon} className="h-5 w-5 text-primary" />
                     </div>
                     <h3 className="font-bold text-lg">{layer.title}</h3>
                     <span className="text-xs text-muted-foreground ml-auto">{layer.skills.length} skill</span>
                   </div>
                   <div className="space-y-3">
-                    {layer.skills.map((skill, i) => (
-                      <Card
+                    {layer.skills.map((skill) => (
+                      <div
                         key={skill.id}
-                        className={`group bg-card/80 backdrop-blur-sm border-border/50 ${layer.border} hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-default`}
+                        className="cosmic-card group p-4 flex items-start gap-3 transition-all duration-300 hover:-translate-y-0.5"
                       >
-                        <CardContent className="p-4 flex items-start gap-3">
-                          <div className="mt-0.5 shrink-0 p-1.5 rounded-md bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                            <SkillIcon name={skill.icon} className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm group-hover:text-primary transition-colors">{skill.name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{skill.description}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
+                        <div className="mt-0.5 shrink-0 p-1.5 rounded-md bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                          <SkillIcon name={skill.icon} className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm group-hover:text-primary transition-colors">{skill.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{skill.description}</p>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -159,30 +169,33 @@ export default function Landing() {
       </section>
 
       {/* Come funziona */}
-      <section className="py-24 px-6 relative">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,hsl(38_92%_44%/0.05),transparent)]" />
+      <section className="py-28 px-6 relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1300, height: 1300, top: -300, right: -700, animationDelay: '3s' }} />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,hsl(var(--primary)/0.05),transparent)]" />
+        </div>
+
         <div className="max-w-5xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
-              <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 px-3 py-1 text-xs">
+              <Badge className="mb-4 bg-primary/10 text-primary border-primary/30 px-3 py-1 text-xs tracking-widest uppercase">
                 Semplicissimo
               </Badge>
-              <h2 className="text-3xl md:text-4xl font-bold">Come funziona</h2>
+              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                <span className="text-gradient-primary">Come </span>
+                <span className="text-gradient-ember">funziona</span>
+              </h2>
             </div>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {steps.map((step, i) => (
               <ScrollReveal key={i} delay={i * 120} direction="scale">
-                <div className="group text-center relative">
-                  {/* Connector line */}
-                  {i < steps.length - 1 && (
-                    <div className="hidden lg:block absolute top-7 left-[calc(50%+28px)] w-[calc(100%-56px)] h-px bg-gradient-to-r from-border to-transparent" />
-                  )}
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:from-primary/30 group-hover:to-primary/10 group-hover:border-primary/20 group-hover:shadow-lg group-hover:shadow-primary/10 transition-all duration-300">
+                <div className="cosmic-card group text-center relative p-6 h-full">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/5 border border-primary/20 flex items-center justify-center mx-auto mb-4 group-hover:shadow-[0_0_30px_hsl(var(--primary)/0.35)] transition-all duration-300">
                     <step.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold mb-3">
+                  <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/15 text-primary text-xs font-bold mb-3 border border-primary/30">
                     {i + 1}
                   </div>
                   <h3 className="font-semibold text-sm mb-2 leading-snug">{step.title}</h3>
@@ -194,7 +207,7 @@ export default function Landing() {
 
           <ScrollReveal delay={500}>
             <div className="mt-12 text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-success/10 border border-success/20 text-success text-sm">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-success/10 border border-success/30 text-success text-sm shadow-[0_0_24px_hsl(var(--success)/0.15)]">
                 <CheckCircle className="h-4 w-4" />
                 Zero automazioni · Tu controlli ogni azione · Nessun rischio ban
               </div>
@@ -204,15 +217,23 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section className="py-24 px-6 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-card/20 to-background" />
+      <section className="py-28 px-6 relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1100, height: 1100, bottom: -400, left: -500, animationDelay: '1.5s' }} />
+          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1100, height: 1100, bottom: -400, right: -500, animationDelay: '4s' }} />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,hsl(var(--primary)/0.06),transparent_70%)]" />
+        </div>
+
         <div className="max-w-5xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
-              <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 px-3 py-1 text-xs">
+              <Badge className="mb-4 bg-primary/10 text-primary border-primary/30 px-3 py-1 text-xs tracking-widest uppercase">
                 Pricing
               </Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Scegli il tuo piano</h2>
+              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
+                <span className="text-gradient-primary">Scegli il tuo </span>
+                <span className="text-gradient-ember">piano</span>
+              </h2>
               <p className="text-muted-foreground max-w-lg mx-auto">
                 Trial gratuito: 14 giorni, 20 skill-run, tutte le skill sbloccate.
               </p>
@@ -222,56 +243,81 @@ export default function Landing() {
           <div className="grid md:grid-cols-3 gap-6">
             {pricing.map((plan, i) => (
               <ScrollReveal key={plan.name} delay={i * 150} direction="up">
-                <Card
-                  className={`group relative bg-card/80 backdrop-blur-sm border-border/50 hover:border-border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
-                    plan.popular ? 'border-primary/50 ring-1 ring-primary/20 shadow-lg shadow-primary/10' : ''
+                <div
+                  className={`cosmic-card group relative p-6 h-full transition-all duration-300 hover:-translate-y-1 ${
+                    plan.popular ? 'ring-1 ring-primary/40 shadow-[0_0_50px_hsl(var(--primary)/0.2)]' : ''
                   }`}
                 >
                   {plan.popular && (
                     <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
                   )}
                   {plan.popular && (
-                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.5)]">
                       Più popolare
                     </Badge>
                   )}
-                  <CardContent className="p-6">
-                    <h3 className="font-bold text-xl mb-1">{plan.name}</h3>
-                    <div className="flex items-baseline gap-1 mb-6">
-                      <span className="text-4xl font-extrabold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">€{plan.price}</span>
-                      <span className="text-muted-foreground">{plan.period}</span>
-                    </div>
-                    <ul className="space-y-3 mb-8">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm">
-                          <CheckCircle className="h-4 w-4 text-success shrink-0 mt-0.5" />
-                          <span className="text-muted-foreground">{f}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link to="/login">
-                      <Button
-                        className={`w-full transition-all duration-300 group-hover:shadow-lg ${
-                          plan.popular
-                            ? 'bg-primary hover:bg-primary-hover text-primary-foreground shadow-md shadow-primary/20 group-hover:shadow-primary/30'
-                            : 'hover:border-primary/50'
-                        }`}
-                        variant={plan.popular ? "default" : "outline"}
-                      >
-                        {plan.cta}
-                        <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
+                  <h3 className="font-bold text-xl mb-1">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 mb-6">
+                    <span className="text-5xl font-extrabold text-gradient-ember">€{plan.price}</span>
+                    <span className="text-muted-foreground">{plan.period}</span>
+                  </div>
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2.5 text-sm">
+                        <CheckCircle className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link to="/login">
+                    <Button
+                      className={`w-full rounded-full transition-all duration-300 ${
+                        plan.popular
+                          ? 'bg-primary hover:bg-primary-hover text-primary-foreground btn-glow'
+                          : 'bg-transparent border border-border hover:border-primary/50 hover:bg-primary/5'
+                      }`}
+                      variant={plan.popular ? "default" : "outline"}
+                    >
+                      {plan.cta}
+                      <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </Button>
+                  </Link>
+                </div>
               </ScrollReveal>
             ))}
           </div>
         </div>
       </section>
 
+      {/* Final CTA */}
+      <section className="py-24 px-6 relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,hsl(var(--primary)/0.15),transparent_60%)] blur-3xl" />
+        </div>
+        <div className="max-w-3xl mx-auto text-center relative z-10">
+          <ScrollReveal>
+            <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6">
+              <span className="text-gradient-ember text-glow-primary">Pronto a accendere</span>
+              <span className="block text-gradient-primary mt-2">il tuo LinkedIn?</span>
+            </h2>
+            <p className="text-muted-foreground text-lg mb-10 max-w-xl mx-auto">
+              14 giorni gratis, nessuna carta. Solo skill, contenuti e prospect.
+            </p>
+            <Link to="/login">
+              <Button
+                size="lg"
+                className="text-base px-10 py-7 bg-primary hover:bg-primary-hover text-primary-foreground rounded-full font-semibold btn-glow transition-all duration-300 hover:scale-[1.03]"
+              >
+                Inizia il trial gratuito
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="border-t border-border/50 py-10 px-6 bg-card/20">
+      <footer className="border-t border-border/40 py-10 px-6 bg-background/40 backdrop-blur-sm relative z-10">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
