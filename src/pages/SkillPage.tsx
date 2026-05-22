@@ -84,6 +84,32 @@ const REGIONI_IT: Array<{ value: string; label: string }> = [
   { value: "Aosta Valley, Italy",            label: "Valle d'Aosta" },
 ];
 
+// v3.8.11 fix: i value contengono virgole (es. "Lombardy, Italy"), quindi NON
+// possiamo serializzare la multi-selezione come CSV. Usiamo "|" come separatore.
+// Per retro-compatibilità, il parser accetta anche valori legacy senza separatore.
+const ZONE_SEP = "|";
+const parseZones = (raw: string | undefined | null): string[] => {
+  const s = (raw || "Italy").trim();
+  if (!s) return ["Italy"];
+  // Nuovo formato: pipe-separated
+  if (s.includes(ZONE_SEP)) return s.split(ZONE_SEP).map((z) => z.trim()).filter(Boolean);
+  // Legacy: se il valore matcha esattamente uno dei value noti, è singolo
+  if (REGIONI_IT.some((r) => r.value === s)) return [s];
+  // Legacy CSV: prova a ricostruire i value validi
+  const parts = s.split(",").map((p) => p.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const two = i + 1 < parts.length ? `${parts[i]}, ${parts[i + 1]}` : null;
+    if (two && REGIONI_IT.some((r) => r.value === two)) {
+      out.push(two);
+      i++;
+    } else if (REGIONI_IT.some((r) => r.value === parts[i])) {
+      out.push(parts[i]);
+    }
+  }
+  return out.length > 0 ? out : ["Italy"];
+};
+
 // ============ UTILITY COMPONENTS ============
 
 function CopyButton({ text }: { text: string }) {
@@ -2583,7 +2609,7 @@ function SkillForm({
           ...prev,
           name: prev.name || (data as any).name || "",
           description: prev.description || (data as any).description || "",
-          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(",") : "Italy"),
+          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(ZONE_SEP) : "Italy"),
         }));
       }
     })();
@@ -2842,28 +2868,30 @@ function SkillForm({
   }
   // v3.8.3: rimossi i form di visual-post-builder e content-performance (skill obsolete).
   if (skillId === "icp-builder") {
-    // v3.7.10: form esteso con Nome ICP (richiesto) + Zone target (multi-select regioni IT).
-    const selectedZones = (values.zone || "Italy").split(",").map((z) => z.trim()).filter(Boolean);
+    // v3.8.11: separatore pipe (i value contengono virgole) + UX migliorata.
+    const selectedZones = parseZones(values.zone);
+    const allItalySelected = selectedZones.length === 1 && selectedZones[0] === "Italy";
+    const writeZones = (zones: string[]) => {
+      const next = zones.length === 0 ? ["Italy"] : zones;
+      setValues((prev) => ({ ...prev, zone: next.join(ZONE_SEP) }));
+    };
     const toggleZone = (z: string) => {
-      const set_ = new Set(selectedZones);
       if (z === "Italy") {
-        // Selezionare "Tutta Italia" deseleziona tutte le altre regioni.
-        setValues((prev) => ({ ...prev, zone: "Italy" }));
+        writeZones(["Italy"]);
         return;
       }
-      // Selezionare una regione specifica deseleziona "Italy" generico.
-      set_.delete("Italy");
+      const set_ = new Set(selectedZones.filter((x) => x !== "Italy"));
       if (set_.has(z)) set_.delete(z);
       else set_.add(z);
-      const next = Array.from(set_);
-      setValues((prev) => ({ ...prev, zone: next.length > 0 ? next.join(",") : "Italy" }));
+      writeZones(Array.from(set_));
     };
     const editingIcpId = searchParams.get("icpId");
+    const regionCount = allItalySelected ? 0 : selectedZones.length;
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            Nome ICP <span className="text-muted-foreground/60">(es. "PMI manifatturiere Lombardia", "Agenzie marketing Roma")</span>
+          <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
+            Nome ICP <span className="text-muted-foreground/60 font-normal">(es. "PMI manifatturiere Lombardia", "Agenzie marketing Roma")</span>
           </label>
           <Input
             placeholder="Nome breve per identificare questo ICP"
@@ -2873,32 +2901,48 @@ function SkillForm({
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Descrizione del cliente ideale</label>
+          <label className="text-xs text-muted-foreground mb-1.5 block font-medium">Descrizione del cliente ideale</label>
           <Textarea
             placeholder="Descrivi il tuo cliente ideale: settore, dimensione, ruoli, problemi che vuole risolvere..."
             value={values.description || ""}
             onChange={(e) => set("description", e.target.value)}
             className="bg-surface border-border/50 focus:border-primary transition-colors"
-            rows={4}
+            rows={5}
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
-            Zone target <span className="text-muted-foreground/60">(scegli una o più regioni; default: tutta Italia)</span>
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs text-muted-foreground font-medium">
+              Zone target{" "}
+              <span className="text-muted-foreground/60 font-normal">
+                {allItalySelected ? "(default: tutta Italia)" : `(${regionCount} ${regionCount === 1 ? "regione" : "regioni"} selezionate)`}
+              </span>
+            </label>
+            {!allItalySelected && (
+              <button
+                type="button"
+                onClick={() => writeZones(["Italy"])}
+                className="text-[11px] text-muted-foreground hover:text-primary transition-colors underline-offset-2 hover:underline"
+              >
+                Reset
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {REGIONI_IT.map((r) => {
               const active = selectedZones.includes(r.value);
+              const isItaly = r.value === "Italy";
               return (
                 <button
                   key={r.value}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => toggleZone(r.value)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
                     active
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-surface border-border/50 hover:border-primary/50 text-muted-foreground"
-                  }`}
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                      : "bg-surface border-border/50 hover:border-primary/60 hover:text-foreground text-muted-foreground"
+                  } ${isItaly ? "font-medium" : ""}`}
                 >
                   {r.label}
                 </button>
@@ -2907,12 +2951,12 @@ function SkillForm({
           </div>
         </div>
         {!editingIcpId && (
-          <p className="text-[11px] text-muted-foreground bg-primary/5 border border-primary/20 rounded-lg p-2">
+          <p className="text-[11px] text-muted-foreground bg-primary/5 border border-primary/20 rounded-lg p-2.5">
             💡 Stai creando un <strong>nuovo ICP</strong>. Verrà aggiunto a "I miei ICP" senza sovrascrivere quelli esistenti.
           </p>
         )}
         {editingIcpId && (
-          <p className="text-[11px] text-muted-foreground bg-amber-500/5 border border-amber-500/20 rounded-lg p-2">
+          <p className="text-[11px] text-muted-foreground bg-amber-500/5 border border-amber-500/20 rounded-lg p-2.5">
             ✏️ Stai <strong>modificando</strong> un ICP esistente. Le modifiche sostituiranno la versione corrente.
           </p>
         )}
@@ -3375,9 +3419,8 @@ export default function SkillPage() {
           const editingIcpId = searchParams.get("icpId");
           const isNewIcp = searchParams.get("new") === "1";
           const inputName = (formValues.name || "").trim();
-          // Zone target: CSV string → array. "Italy" significa "tutta Italia" e va passato come-is.
-          const zonesCsv = (formValues.zone || "Italy").trim();
-          const zones = zonesCsv.split(",").map((z) => z.trim()).filter(Boolean);
+          // v3.8.11: parse pipe-separated (legacy CSV gestito da parseZones).
+          const zones = parseZones(formValues.zone);
           const filtersOverride: Record<string, unknown> = zones.length > 0 ? { locations: zones } : {};
 
           const fields = {
