@@ -13,10 +13,9 @@ import SkillPage from "./pages/SkillPage";
 import History from "./pages/History";
 import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
-import Icps from "./pages/Icps";
-import Searches from "./pages/Searches";
 import Profilo from "./pages/Profilo";
 import Content from "./pages/Content";
+import Prospect from "./pages/Prospect";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,16 +61,13 @@ const App = () => (
                 <Settings />
               </ProtectedRoute>
             } />
-            <Route path="/icps" element={
+            <Route path="/prospect" element={
               <ProtectedRoute>
-                <Icps />
+                <Prospect />
               </ProtectedRoute>
             } />
-            <Route path="/searches" element={
-              <ProtectedRoute>
-                <Searches />
-              </ProtectedRoute>
-            } />
+            <Route path="/icps" element={<Navigate to="/prospect?tab=target" replace />} />
+            <Route path="/searches" element={<Navigate to="/prospect?tab=storico" replace />} />
             <Route path="/brand" element={<Navigate to="/profilo#brand-voice" replace />} />
             <Route path="/content" element={
               <ProtectedRoute>
