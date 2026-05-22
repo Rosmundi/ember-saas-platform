@@ -186,6 +186,22 @@ export function AppSidebar() {
               </SidebarMenuItem>
 
               <NestedGroup
+                basePath="/profilo"
+                title="Il mio profilo"
+                icon={UserCheck}
+                subNav={profiloSubNav}
+                collapsed={collapsed}
+              />
+
+              <NestedGroup
+                basePath="/content"
+                title="I miei contenuti"
+                icon={Sparkles}
+                subNav={contentSubNav}
+                collapsed={collapsed}
+              />
+
+              <NestedGroup
                 basePath="/prospect"
                 title="Prospect"
                 icon={Radar}
@@ -224,29 +240,6 @@ export function AppSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu>
-                {layer.label === "PROFILO" && (
-                  <NestedGroup
-                    basePath="/profilo"
-                    title="Il mio profilo"
-                    icon={UserCheck}
-                    subNav={profiloSubNav}
-                    collapsed={collapsed}
-                  />
-                )}
-                {layer.label === "CONTENT" && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to="/content"
-                        className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
-                        activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
-                      >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>I miei contenuti</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
                 {layer.skills.map((skill) => {
                   const available = skill.plans.includes(plan);
                   return (
