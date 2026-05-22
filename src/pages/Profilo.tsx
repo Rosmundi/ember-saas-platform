@@ -2,7 +2,7 @@
 // 2 sezioni vere (Stato + Audit). Tutto il resto è chrome: header, brand widget,
 // footer azioni, modal raw LinkedIn.
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export default function Profilo() {
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
   const [rawDialogOpen, setRawDialogOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
 
   // Compat redirect legacy: ?action=reaudit / ?action=rescan
   useEffect(() => {
@@ -40,6 +41,15 @@ export default function Profilo() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hash scroll
+  useEffect(() => {
+    if (!location.hash) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(location.hash.slice(1));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [location.hash, loading]);
 
   if (loading) {
     return (
@@ -83,7 +93,7 @@ export default function Profilo() {
               Tutto quello che Ember sa di te + le 3 cose da sistemare adesso.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" id="brand-voice" style={{ scrollMarginTop: 16 }}>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2 border-border/50">
@@ -110,16 +120,22 @@ export default function Profilo() {
         </div>
 
         {/* SEZIONE 1: STATO */}
-        <StatoSection audit={hasAudit ? audit : null} />
+        <div id="stato" style={{ scrollMarginTop: 16 }}>
+          <StatoSection audit={hasAudit ? audit : null} />
+        </div>
 
         {/* SEZIONE 2: AUDIT (header LinkedIn-like + 7 card sezione) */}
         <div className="space-y-4">
-          <ProfileHeaderCard
-            businessProfile={profile.business_profile}
-            profilePictureUrl={audit?.profile_picture_url ?? null}
-            coverPictureUrl={audit?.cover_picture_url ?? null}
-          />
-          <AuditSection sezioni={audit?.sezioni || []} />
+          <div id="chi-sei" style={{ scrollMarginTop: 16 }}>
+            <ProfileHeaderCard
+              businessProfile={profile.business_profile}
+              profilePictureUrl={audit?.profile_picture_url ?? null}
+              coverPictureUrl={audit?.cover_picture_url ?? null}
+            />
+          </div>
+          <div id="audit" style={{ scrollMarginTop: 16 }}>
+            <AuditSection sezioni={audit?.sezioni || []} />
+          </div>
         </div>
 
         {/* FOOTER */}
@@ -128,6 +144,8 @@ export default function Profilo() {
             <p className="text-sm text-muted-foreground">Altre azioni sul profilo</p>
             <div className="flex items-center gap-2 flex-wrap">
               <Button
+                id="banner"
+                style={{ scrollMarginTop: 16 }}
                 variant="outline"
                 size="sm"
                 onClick={() => setBannerDialogOpen(true)}
@@ -137,6 +155,8 @@ export default function Profilo() {
                 Crea brief banner
               </Button>
               <Button
+                id="dati-linkedin"
+                style={{ scrollMarginTop: 16 }}
                 variant="ghost"
                 size="sm"
                 onClick={() => setRawDialogOpen(true)}

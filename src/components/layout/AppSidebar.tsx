@@ -1,26 +1,135 @@
-// src/components/layout/AppSidebar.tsx — v3.8.0 (Tranche 1): voce "Brand" in mainNav
-import { useLocation } from "react-router-dom";
+// src/components/layout/AppSidebar.tsx — v3.8.10.1: Prospect + Profilo nidificati con sub-link
+import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { SkillIcon } from "@/components/SkillIcon";
 import { SKILLS } from "@/lib/ember-types";
 import { useProfile } from "@/hooks/useProfile";
 import {
-  LayoutDashboard, Clock, Radar, Settings, LogOut, Sparkles, UserCheck,
+  LayoutDashboard, Clock, Radar, Settings, Sparkles, UserCheck,
+  ChevronDown, Target, Search, History as HistoryIcon,
+  Activity, User as UserIcon, Palette, ListChecks, ImageIcon, FileText,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Prospect", url: "/prospect", icon: Radar },
   { title: "Cronologia", url: "/history", icon: Clock },
   { title: "Watchlist", url: "/watchlist", icon: Radar },
   { title: "Impostazioni", url: "/settings", icon: Settings },
 ];
+
+const prospectSubNav = [
+  { title: "Target (ICP)", hash: "#target", icon: Target },
+  { title: "Cerca prospect", hash: "#cerca", icon: Search },
+  { title: "Ricerche", hash: "#ricerche", icon: HistoryIcon },
+];
+
+const profiloSubNav = [
+  { title: "Stato", hash: "#stato", icon: Activity },
+  { title: "Chi sei", hash: "#chi-sei", icon: UserIcon },
+  { title: "Brand voice", hash: "#brand-voice", icon: Palette },
+  { title: "Audit sezioni", hash: "#audit", icon: ListChecks },
+  { title: "Banner", hash: "#banner", icon: ImageIcon },
+  { title: "Dati LinkedIn", hash: "#dati-linkedin", icon: FileText },
+];
+
+function NestedGroup({
+  basePath,
+  title,
+  icon: Icon,
+  subNav,
+  collapsed,
+}: {
+  basePath: string;
+  title: string;
+  icon: any;
+  subNav: { title: string; hash: string; icon: any }[];
+  collapsed: boolean;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onPage = location.pathname === basePath;
+  const isExpanded = onPage;
+
+  const handleSubClick = (e: React.MouseEvent, hash: string) => {
+    e.preventDefault();
+    const id = hash.slice(1);
+    if (onPage) {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      navigate(`${basePath}${hash}`, { replace: true });
+    } else {
+      navigate(`${basePath}${hash}`);
+    }
+  };
+
+  if (collapsed) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild>
+          <NavLink
+            to={basePath}
+            end
+            className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
+            activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
+          >
+            <Icon className="mr-2 h-4 w-4" />
+          </NavLink>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
+
+  return (
+    <Collapsible defaultOpen={isExpanded} className="group/collapsible">
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton
+            className={cn(
+              "hover:bg-accent/80 transition-all duration-200 rounded-lg w-full",
+              onPage && "bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]",
+            )}
+          >
+            <Icon className="mr-2 h-4 w-4" />
+            <span className="flex-1 text-left">{title}</span>
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="ml-6 mt-1 space-y-0.5 border-l border-border/40 pl-2">
+            {subNav.map((sub) => {
+              const active = onPage && location.hash === sub.hash;
+              return (
+                <li key={sub.hash}>
+                  <a
+                    href={`${basePath}${sub.hash}`}
+                    onClick={(e) => handleSubClick(e, sub.hash)}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
+                      active
+                        ? "bg-accent text-primary font-medium"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                    )}
+                  >
+                    <sub.icon className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{sub.title}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
 
 const layers = [
   { label: "PROFILO", skills: SKILLS.filter(s => s.layer === 'profilo'), color: "text-layer-profilo" },
@@ -30,7 +139,6 @@ const layers = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const { profile } = useProfile();
   const plan = profile?.plan || 'trial';
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
@@ -53,7 +161,29 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/dashboard"
+                    end
+                    className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
+                    activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
+                  >
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    {!collapsed && <span>Dashboard</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <NestedGroup
+                basePath="/prospect"
+                title="Prospect"
+                icon={Radar}
+                subNav={prospectSubNav}
+                collapsed={collapsed}
+              />
+
+              {mainNav.slice(1).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -85,18 +215,13 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {layer.label === "PROFILO" && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to="/profilo"
-                        className="hover:bg-accent/80 transition-all duration-200 rounded-lg"
-                        activeClassName="bg-accent text-primary font-medium shadow-[inset_3px_0_0_hsl(38_92%_44%)]"
-                      >
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>Il mio profilo</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <NestedGroup
+                    basePath="/profilo"
+                    title="Il mio profilo"
+                    icon={UserCheck}
+                    subNav={profiloSubNav}
+                    collapsed={collapsed}
+                  />
                 )}
                 {layer.label === "CONTENT" && (
                   <SidebarMenuItem>

@@ -7,8 +7,8 @@
 // nello storico (apre /skill/prospect-finder?searchId=...).
 // ============================================================================
 
-import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -581,8 +581,33 @@ function HistorySection() {
 
 export default function Prospect() {
   const [params, setParams] = useSearchParams();
-  const initial = (params.get("tab") as "target" | "cerca" | "storico") || "target";
+  const location = useLocation();
+
+  const hashToTab = (hash: string): "target" | "cerca" | "storico" | null => {
+    if (hash === "#target") return "target";
+    if (hash === "#cerca") return "cerca";
+    if (hash === "#ricerche" || hash === "#storico") return "storico";
+    return null;
+  };
+
+  const initial =
+    hashToTab(location.hash) ||
+    ((params.get("tab") as "target" | "cerca" | "storico") || "target");
   const [tab, setTab] = useState<"target" | "cerca" | "storico">(initial);
+
+  // Sync hash → tab + scroll
+  useEffect(() => {
+    const t = hashToTab(location.hash);
+    if (t && t !== tab) setTab(t);
+    if (location.hash) {
+      requestAnimationFrame(() => {
+        const id = location.hash.slice(1);
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.hash]);
 
   const onTabChange = (v: string) => {
     setTab(v as typeof tab);
@@ -612,9 +637,9 @@ export default function Prospect() {
             <TabsTrigger value="cerca"><Search className="h-3.5 w-3.5 mr-1.5" />Cerca</TabsTrigger>
             <TabsTrigger value="storico"><HistoryIcon className="h-3.5 w-3.5 mr-1.5" />Storico</TabsTrigger>
           </TabsList>
-          <TabsContent value="target" className="mt-6"><TargetSection /></TabsContent>
-          <TabsContent value="cerca" className="mt-6"><SearchSection /></TabsContent>
-          <TabsContent value="storico" className="mt-6"><HistorySection /></TabsContent>
+          <TabsContent value="target" className="mt-6" id="target" style={{ scrollMarginTop: 16 }}><TargetSection /></TabsContent>
+          <TabsContent value="cerca" className="mt-6" id="cerca" style={{ scrollMarginTop: 16 }}><SearchSection /></TabsContent>
+          <TabsContent value="storico" className="mt-6" id="ricerche" style={{ scrollMarginTop: 16 }}><HistorySection /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>
