@@ -2609,7 +2609,7 @@ function SkillForm({
           ...prev,
           name: prev.name || (data as any).name || "",
           description: prev.description || (data as any).description || "",
-          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(",") : "Italy"),
+          zone: prev.zone && prev.zone !== "Italy" ? prev.zone : (locs.length > 0 ? locs.join(ZONE_SEP) : "Italy"),
         }));
       }
     })();
