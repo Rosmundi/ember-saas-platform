@@ -3419,9 +3419,8 @@ export default function SkillPage() {
           const editingIcpId = searchParams.get("icpId");
           const isNewIcp = searchParams.get("new") === "1";
           const inputName = (formValues.name || "").trim();
-          // Zone target: CSV string → array. "Italy" significa "tutta Italia" e va passato come-is.
-          const zonesCsv = (formValues.zone || "Italy").trim();
-          const zones = zonesCsv.split(",").map((z) => z.trim()).filter(Boolean);
+          // v3.8.11: parse pipe-separated (legacy CSV gestito da parseZones).
+          const zones = parseZones(formValues.zone);
           const filtersOverride: Record<string, unknown> = zones.length > 0 ? { locations: zones } : {};
 
           const fields = {
