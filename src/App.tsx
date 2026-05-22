@@ -10,7 +10,6 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import SkillPage from "./pages/SkillPage";
-import History from "./pages/History";
 import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
 import Profilo from "./pages/Profilo";
