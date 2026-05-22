@@ -5,7 +5,7 @@ import { SkillIcon } from "@/components/SkillIcon";
 import { SKILLS } from "@/lib/ember-types";
 import { useProfile } from "@/hooks/useProfile";
 import {
-  LayoutDashboard, Clock, Radar, Settings, LogOut, Target, History, Sparkles, UserCheck,
+  LayoutDashboard, Clock, Radar, Settings, LogOut, Sparkles, UserCheck,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Prospect", url: "/prospect", icon: Radar },
   { title: "Cronologia", url: "/history", icon: Clock },
   { title: "Watchlist", url: "/watchlist", icon: Radar },
   { title: "Impostazioni", url: "/settings", icon: Settings },
@@ -24,7 +25,6 @@ const mainNav = [
 const layers = [
   { label: "PROFILO", skills: SKILLS.filter(s => s.layer === 'profilo'), color: "text-layer-profilo" },
   { label: "CONTENT", skills: SKILLS.filter(s => s.layer === 'content'), color: "text-layer-content" },
-  { label: "PROSPECT", skills: SKILLS.filter(s => s.layer === 'prospect'), color: "text-layer-prospect" },
 ];
 
 export function AppSidebar() {
