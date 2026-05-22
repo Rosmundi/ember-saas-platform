@@ -26,6 +26,7 @@ export default function Profilo() {
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
   const [rawDialogOpen, setRawDialogOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
 
   // Compat redirect legacy: ?action=reaudit / ?action=rescan
   useEffect(() => {
@@ -40,6 +41,15 @@ export default function Profilo() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hash scroll
+  useEffect(() => {
+    if (!location.hash) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(location.hash.slice(1));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [location.hash, loading]);
 
   if (loading) {
     return (
