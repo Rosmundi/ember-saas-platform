@@ -13,10 +13,9 @@ import SkillPage from "./pages/SkillPage";
 import History from "./pages/History";
 import Watchlist from "./pages/Watchlist";
 import Settings from "./pages/Settings";
-import Icps from "./pages/Icps";
-import Searches from "./pages/Searches";
 import Profilo from "./pages/Profilo";
 import Content from "./pages/Content";
+import Prospect from "./pages/Prospect";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
