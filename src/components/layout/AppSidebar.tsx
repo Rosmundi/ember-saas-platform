@@ -31,7 +31,6 @@ const profiloSubNav = [
   { title: "Brand voice", hash: "#brand-voice", icon: Palette },
   { title: "Audit sezioni", hash: "#audit", icon: ListChecks },
   { title: "Banner", hash: "#banner", icon: ImageIcon },
-  { title: "Dati LinkedIn", hash: "#dati-linkedin", icon: FileText },
 ];
 
 const prospectSubNav = [
