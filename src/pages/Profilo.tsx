@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverTrigger, PopoverContent,
 } from "@/components/ui/popover";
-import { RefreshCw, Palette, ImagePlus, FileText, Loader2 } from "lucide-react";
+import { RefreshCw, Palette, ImagePlus, Loader2 } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { OnboardingEmptyState } from "@/components/profile/OnboardingEmptyState";
 import { StatoSection } from "@/components/profile/StatoSection";
@@ -18,13 +18,13 @@ import { ProfileHeaderCard } from "@/components/profile/ProfileHeaderCard";
 import { BrandVoiceWidget } from "@/components/profile/BrandVoiceWidget";
 import { UpdateAuditDialog } from "@/components/profile/dialogs/UpdateAuditDialog";
 import { BannerBriefDialog } from "@/components/profile/dialogs/BannerBriefDialog";
-import { RawLinkedInDialog } from "@/components/profile/dialogs/RawLinkedInDialog";
+
 
 export default function Profilo() {
   const { profile, loading, onboardingCompleted } = useProfile();
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
-  const [rawDialogOpen, setRawDialogOpen] = useState(false);
+  
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
 
@@ -154,17 +154,6 @@ export default function Profilo() {
                 <ImagePlus className="h-3.5 w-3.5" />
                 Crea brief banner
               </Button>
-              <Button
-                id="dati-linkedin"
-                style={{ scrollMarginTop: 16 }}
-                variant="ghost"
-                size="sm"
-                onClick={() => setRawDialogOpen(true)}
-                className="gap-2"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Vedi profilo grezzo
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -172,7 +161,7 @@ export default function Profilo() {
         {/* DIALOGS */}
         <UpdateAuditDialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen} />
         <BannerBriefDialog open={bannerDialogOpen} onOpenChange={setBannerDialogOpen} />
-        <RawLinkedInDialog open={rawDialogOpen} onOpenChange={setRawDialogOpen} />
+        
       </div>
     </AppLayout>
   );
