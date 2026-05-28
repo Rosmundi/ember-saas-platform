@@ -1,23 +1,31 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+// Cache module-level: l'onboarding viene controllato UNA SOLA VOLTA per sessione utente.
+// Evita flash "Caricamento..." ad ogni cambio rotta.
+let onboardingCache: { userId: string; done: boolean } | null = null;
+
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const [checkingProfile, setCheckingProfile] = useState(true);
-  const [onboardingDone, setOnboardingDone] = useState(false);
+  const cached = user && onboardingCache?.userId === user.id ? onboardingCache.done : null;
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(cached);
+  const fetchedRef = useRef<string | null>(cached !== null && user ? user.id : null);
 
   useEffect(() => {
     if (!user) {
-      setCheckingProfile(false);
+      setOnboardingDone(null);
+      fetchedRef.current = null;
       return;
     }
+    if (fetchedRef.current === user.id) return;
+    fetchedRef.current = user.id;
 
     supabase
       .from("profiles")
@@ -25,17 +33,19 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
-        setOnboardingDone(data?.onboarding_completed ?? false);
-        setCheckingProfile(false);
+        const done = data?.onboarding_completed ?? false;
+        onboardingCache = { userId: user.id, done };
+        setOnboardingDone(done);
       });
   }, [user]);
 
-  if (loading || checkingProfile) {
+  // Solo l'initial auth load mostra lo splash. Le successive nav non bloccano.
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#D97706] to-[#92400E]" />
-          <p className="text-[#94A3B8] text-sm font-medium">Caricamento...</p>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-hover" />
+          <p className="text-muted-foreground text-sm font-medium">Caricamento...</p>
         </div>
       </div>
     );
@@ -45,7 +55,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!onboardingDone && location.pathname !== "/profilo") {
+  // Onboarding non ancora verificato (prima fetch in corso): renderizza comunque i children.
+  // Il redirect a /profilo avviene appena la verifica torna `false`.
+  if (onboardingDone === false && location.pathname !== "/profilo") {
     return <Navigate to="/profilo" replace />;
   }
 
