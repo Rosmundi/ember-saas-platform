@@ -51,7 +51,15 @@ const pricing = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden cosmic-bg">
+    <div className="min-h-screen bg-background overflow-x-hidden relative">
+      {/* Continuous ambient backdrop — copre tutta la pagina, fluido tra sezioni */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1400, height: 1400, top: -300, left: -700 }} />
+        <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1600, height: 1600, top: -200, right: -800, animationDelay: '2.5s' }} />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_20%,hsl(var(--primary)/0.10),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_90%,hsl(var(--neon-magenta)/0.06),transparent_70%)]" />
+      </div>
+
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -68,12 +76,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-36 pb-32 px-6 overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1400, height: 1400, top: -200, left: -700 }} />
-          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1600, height: 1600, top: -300, right: -800, animationDelay: '2.5s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-[radial-gradient(circle,hsl(var(--primary)/0.10),transparent_60%)] blur-3xl" />
-        </div>
+      <section className="relative pt-36 pb-32 px-6">
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <ScrollReveal>
@@ -115,12 +118,7 @@ export default function Landing() {
       </section>
 
       {/* 3 Layer, 10 Skill */}
-      <section className="py-28 px-6 relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1200, height: 1200, top: -400, left: -600, animationDelay: '1s' }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_50%,hsl(var(--primary)/0.06),transparent_70%)]" />
-        </div>
-
+      <section className="py-28 px-6 relative">
         <div className="max-w-6xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
@@ -169,12 +167,7 @@ export default function Landing() {
       </section>
 
       {/* Come funziona */}
-      <section className="py-28 px-6 relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1300, height: 1300, top: -300, right: -700, animationDelay: '3s' }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,hsl(var(--primary)/0.05),transparent)]" />
-        </div>
-
+      <section className="py-28 px-6 relative">
         <div className="max-w-5xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
@@ -217,13 +210,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section className="py-28 px-6 relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1100, height: 1100, bottom: -400, left: -500, animationDelay: '1.5s' }} />
-          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1100, height: 1100, bottom: -400, right: -500, animationDelay: '4s' }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,hsl(var(--primary)/0.06),transparent_70%)]" />
-        </div>
-
+      <section className="py-28 px-6 relative">
         <div className="max-w-5xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
