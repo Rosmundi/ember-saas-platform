@@ -118,12 +118,7 @@ export default function Landing() {
       </section>
 
       {/* 3 Layer, 10 Skill */}
-      <section className="py-28 px-6 relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1200, height: 1200, top: -400, left: -600, animationDelay: '1s' }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_50%,hsl(var(--primary)/0.06),transparent_70%)]" />
-        </div>
-
+      <section className="py-28 px-6 relative">
         <div className="max-w-6xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
