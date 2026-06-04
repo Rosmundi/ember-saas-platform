@@ -51,7 +51,15 @@ const pricing = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden cosmic-bg">
+    <div className="min-h-screen bg-background overflow-x-hidden relative">
+      {/* Continuous ambient backdrop — copre tutta la pagina, fluido tra sezioni */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1400, height: 1400, top: -300, left: -700 }} />
+        <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1600, height: 1600, top: -200, right: -800, animationDelay: '2.5s' }} />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_20%,hsl(var(--primary)/0.10),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_90%,hsl(var(--neon-magenta)/0.06),transparent_70%)]" />
+      </div>
+
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -68,12 +76,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-36 pb-32 px-6 overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1400, height: 1400, top: -200, left: -700 }} />
-          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1600, height: 1600, top: -300, right: -800, animationDelay: '2.5s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-[radial-gradient(circle,hsl(var(--primary)/0.10),transparent_60%)] blur-3xl" />
-        </div>
+      <section className="relative pt-36 pb-32 px-6">
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <ScrollReveal>
