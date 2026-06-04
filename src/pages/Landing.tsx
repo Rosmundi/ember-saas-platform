@@ -167,12 +167,7 @@ export default function Landing() {
       </section>
 
       {/* Come funziona */}
-      <section className="py-28 px-6 relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1300, height: 1300, top: -300, right: -700, animationDelay: '3s' }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,hsl(var(--primary)/0.05),transparent)]" />
-        </div>
-
+      <section className="py-28 px-6 relative">
         <div className="max-w-5xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
