@@ -210,13 +210,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section className="py-28 px-6 relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="neon-arc neon-arc-cyan animate-float" style={{ width: 1100, height: 1100, bottom: -400, left: -500, animationDelay: '1.5s' }} />
-          <div className="neon-arc neon-arc-magenta animate-float" style={{ width: 1100, height: 1100, bottom: -400, right: -500, animationDelay: '4s' }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_50%,hsl(var(--primary)/0.06),transparent_70%)]" />
-        </div>
-
+      <section className="py-28 px-6 relative">
         <div className="max-w-5xl mx-auto relative z-10">
           <ScrollReveal>
             <div className="text-center mb-16">
